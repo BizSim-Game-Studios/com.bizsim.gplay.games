@@ -6,10 +6,12 @@
 
 **Unity bridge for Google Play Games Services v2**
 
+> **⚠️ Unofficial package.** This is a community-built Unity bridge for [Google Play Games Services v2](https://developers.google.com/games/services). It is **not** an official Google product.
+
 Version: **0.1.0** (Initial Release)
 Unity: 6000.3+
 Platform: Android
-License: MIT
+License: MIT (package code) — see [Third-Party Licenses](#-third-party-licenses) for SDK terms
 
 ---
 
@@ -69,8 +71,30 @@ Failure to comply may result in **app rejection or removal from Google Play Stor
 
 ## 📦 Installation
 
-This package is installed locally in `JunkyardTycoon/Packages/`.
-For other projects, add via `manifest.json` or copy package folder.
+### Option 1: Git URL (recommended)
+
+1. In Unity Editor: **Window > Package Manager > + > Add package from git URL...**
+2. Enter:
+   ```
+   https://github.com/BizSim-Game-Studios/com.bizsim.gplay.games.git
+   ```
+
+3. Or add directly to `Packages/manifest.json`:
+   ```json
+   "com.bizsim.gplay.games": "https://github.com/BizSim-Game-Studios/com.bizsim.gplay.games.git"
+   ```
+
+### Option 2: Local path
+
+```json
+"com.bizsim.gplay.games": "file:../path/to/com.bizsim.gplay.games"
+```
+
+### After Installation
+
+1. Get your resources XML from [Google Play Console](https://play.google.com/console)
+2. Open the setup window: **BizSim > Google Play > Games Services > Setup**
+3. Paste the XML and click "Setup" to configure your Android project
 
 ---
 
@@ -189,13 +213,28 @@ Debug.Log($"High spender probability: {stats.highSpenderProbability}");
 
 ## 📝 License
 
-MIT License - Copyright (c) 2026 BizSim Game Studios
+This package's C# and Java source code is licensed under the [MIT License](LICENSE.md) — Copyright (c) 2026 BizSim Game Studios.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+See [LICENSE.md](LICENSE.md) for the full MIT license text.
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+---
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 📦 Third-Party Licenses
+
+This package does **not** bundle any Google SDK binaries. Native Android dependencies are resolved at build time via Gradle from the Google Maven repository (`maven.google.com`):
+
+| Dependency | Version | License |
+|-----------|---------|---------|
+| `com.google.android.gms:play-services-games-v2` | 20.1.1 | [Android SDK License Agreement](https://developer.android.com/studio/terms) |
+| `com.google.android.gms:play-services-tasks` | 18.0.2 | [Android SDK License Agreement](https://developer.android.com/studio/terms) |
+
+By installing and using this package, you agree to the [Android Software Development Kit License Agreement](https://developer.android.com/studio/terms) and the [Google APIs Terms of Service](https://developers.google.com/terms).
+
+For full third-party license details, see [NOTICES.md](NOTICES.md).
+
+### Open Source Notices in Your App
+
+Google Play Services libraries contain open source components. Google requires that apps display these notices to end users. See [Include open source notices](https://developers.google.com/android/guides/opensource) for instructions on using the `oss-licenses-plugin` Gradle plugin.
 
 ---
 

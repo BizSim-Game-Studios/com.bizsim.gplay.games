@@ -1,37 +1,59 @@
 # Third-Party Notices
 
-This package contains or depends on third-party software. The original copyright
-notices and licenses are listed below.
+This package depends on third-party libraries that are **not bundled** with the package.
+They are resolved at build time via Gradle dependency injection from the Google Maven
+repository (`maven.google.com`).
 
 ---
 
-## Google Play Games Services v2 SDK
+## Google Play Games Services v2
 
-- **Version:** 20.1.1
-- **License:** Apache License 2.0
-- **Source:** [Google Play Services](https://developers.google.com/android/guides/setup)
+- **Library:** `com.google.android.gms:play-services-games-v2:20.1.1`
+- **Copyright:** Copyright Google LLC
+- **License:** [Android Software Development Kit License Agreement](https://developer.android.com/studio/terms)
+  (in addition to the [Google APIs Terms of Service](https://developers.google.com/terms))
+- **Policies:** [Play Games Services Terms of Service](https://developer.android.com/games/pgs/terms)
 
-```
-Copyright 2024 Google LLC
+By using this package, you agree to the Android SDK License Agreement. Key terms:
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+- Google grants a limited, worldwide, royalty-free, non-sublicensable license to use the SDK
+  solely to develop applications for compatible implementations of Android
+- You may **not** copy (except for backup), modify, adapt, redistribute, decompile,
+  reverse engineer, disassemble, or create derivative works of the SDK
+- Google and its licensors retain all intellectual property rights
 
-    http://www.apache.org/licenses/LICENSE-2.0
+### Google Play Games Services Policy Compliance
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-```
+Your app must comply with:
+
+- [Quality Checklist](https://developer.android.com/games/pgs/quality) — minimum achievement count, saved game metadata, etc.
+- [Branding Guidelines](https://developer.android.com/games/pgs/branding) — required icons, pop-up behavior
+- [Data Collection Policies](https://developer.android.com/games/pgs/data-collection) — 30-day friends data retention limit
+- [Terms of Service](https://developer.android.com/games/pgs/terms) — no false gameplay data, no unauthorized invites
 
 ---
 
-## External Dependency Manager for Unity (EDM4U)
+## Google Play Tasks API
 
-- **License:** Apache License 2.0
-- **Source:** [google/unity-jar-resolver](https://github.com/googlesamples/unity-jar-resolver)
+- **Library:** `com.google.android.gms:play-services-tasks:18.0.2`
+- **Copyright:** Copyright Google LLC
+- **License:** [Android Software Development Kit License Agreement](https://developer.android.com/studio/terms)
 
-Used to resolve the Google Play Games Services AAR dependency at build time.
+Used internally for asynchronous operations in the JNI bridge layer.
+
+---
+
+## Unity Editor APIs
+
+This package uses Unity Editor APIs (`UnityEditor` namespace) for the setup wizard,
+documentation window, and custom inspectors. These APIs are subject to the
+[Unity Software Additional Terms](https://unity.com/legal/terms-of-service/software).
+
+---
+
+## Open Source Notices in Your App
+
+Google Play Services libraries contain open source components. Google requires that apps
+display these notices to end users. See
+[Include open source notices](https://developers.google.com/android/guides/opensource)
+for instructions on using the `oss-licenses-plugin` Gradle plugin.
