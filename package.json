@@ -1,0 +1,49 @@
+{
+  "name": "com.bizsim.gplay.games",
+  "displayName": "Google Play Games Services Bridge",
+  "description": "Unity bridge for Google Play Games Services v2. Modular async API for Authentication, Achievements, Leaderboards, Saved Games, and Player Stats. ISocialPlatform-independent.",
+  "version": "0.1.0",
+  "unity": "6000.3",
+  "changelogUrl": "https://github.com/BizSim-Game-Studios/com.bizsim.gplay.games/blob/main/CHANGELOG.md",
+  "documentationUrl": "https://github.com/BizSim-Game-Studios/com.bizsim.gplay.games/blob/main/README.md",
+  "author": {
+    "name": "BizSim Game Studios",
+    "url": "https://github.com/BizSim-Game-Studios"
+  },
+  "contributors": [
+    {
+      "name": "Aşkın Ceyhan",
+      "url": "https://github.com/AskinCeyhan"
+    }
+  ],
+  "company": "BizSim Game Studios",
+  "homepage": "https://www.bizsim.com",
+  "license": "MIT",
+  "keywords": [
+    "google-play",
+    "play-games-services",
+    "achievements",
+    "leaderboards",
+    "saved-games",
+    "cloud-save",
+    "android"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BizSim-Game-Studios/com.bizsim.gplay.games.git"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Integration",
+      "description": "Authentication, achievements, and leaderboard submission in a single scene.",
+      "path": "Samples~/BasicIntegration"
+    },
+    {
+      "displayName": "Mock Config Presets",
+      "description": "Pre-configured mock configs for common scenarios (authenticated, guest, error).",
+      "path": "Samples~/MockPresets"
+    }
+  ],
+  "testables": ["com.bizsim.gplay.games"],
+  "dependencies": {}
+}

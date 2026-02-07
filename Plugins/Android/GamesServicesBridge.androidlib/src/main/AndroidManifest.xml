@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) BizSim Game Studios. All rights reserved. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.bizsim.gplay.games">
+
+    <!-- No permissions required - PGS v2 handles this internally -->
+
+</manifest>

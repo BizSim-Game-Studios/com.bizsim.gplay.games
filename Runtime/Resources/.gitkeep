@@ -1,0 +1,4 @@
+# Resources folder for mock configs
+# Create DefaultGamesConfig via Unity Editor:
+# Assets → Create → BizSim → Games Services Mock Config
+# File will be automatically named "DefaultGamesConfig.asset"

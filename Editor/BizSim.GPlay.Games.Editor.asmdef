@@ -1,0 +1,19 @@
+{
+  "name": "BizSim.GPlay.Games.Editor",
+  "rootNamespace": "BizSim.GPlay.Games.Editor",
+  "references": [
+    "BizSim.GPlay.Games",
+    "BizSim.GPlay.EditorCore"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

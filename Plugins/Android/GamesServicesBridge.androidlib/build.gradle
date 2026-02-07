@@ -1,0 +1,35 @@
+// Copyright (c) BizSim Game Studios. All rights reserved.
+
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion 34
+    namespace "com.bizsim.gplay.games"
+
+    defaultConfig {
+        minSdkVersion 24
+        targetSdkVersion 34
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    // Google Play Games Services v2 (CRITICAL: Use v2, NEVER v1)
+    implementation 'com.google.android.gms:play-services-games-v2:20.1.1'
+
+    // Google Play Tasks API (async operations)
+    implementation 'com.google.android.gms:play-services-tasks:18.0.2'
+}
