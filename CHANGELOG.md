@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 2026-02-09
+
+### Fixed
+- Added `consumer-rules.pro` for R8/ProGuard compatibility — consumer keep rules now propagate to the app's minification pass, preventing `ClassNotFoundException` for JNI bridge classes
+- Added `consumerProguardFiles` directive to `build.gradle`
+
+### Added
+- `.gitattributes` for consistent line endings across platforms
+
+---
+
 ## [1.0.0] - 2026-02-01
 
 ### 🎉 First Stable Release - Complete Feature Set
