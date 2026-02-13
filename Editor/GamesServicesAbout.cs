@@ -99,7 +99,8 @@ namespace BizSim.GPlay.Games.Editor
 
             EditorGUILayout.HelpBox(
                 "External Dependencies (auto-injected via Gradle):\n" +
-                "• com.google.android.gms:play-services-games-v2:20.1.1",
+                "• com.google.android.gms:play-services-games-v2:21.0.0\n" +
+                "• com.google.android.gms:play-services-tasks:18.4.1",
                 MessageType.Info);
 
             EditorGUILayout.Space(5);

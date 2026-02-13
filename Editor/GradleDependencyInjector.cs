@@ -23,7 +23,7 @@ namespace BizSim.GPlay.Games.Editor
     {
         public int callbackOrder => 0;
 
-        private const string DependencyLine = "    implementation 'com.google.android.gms:play-services-games-v2:20.1.1'";
+        private const string DependencyLine = "    implementation 'com.google.android.gms:play-services-games-v2:21.0.0'";
         private const string GoogleRepoLine = "        google()";
         private const string MavenCentralLine = "        mavenCentral()";
 

@@ -12,7 +12,12 @@
     void onAuthFailure(int, java.lang.String);
     void onServerSideAccessSuccess(java.lang.String);
     void onServerSideAccessFailure(int, java.lang.String);
+    void onServerSideAccessWithScopesSuccess(java.lang.String, java.lang.String);
+    void onServerSideAccessWithScopesFailure(int, java.lang.String);
 }
+
+-keep class com.google.android.gms.games.gamessignin.AuthResponse { *; }
+-keep class com.google.android.gms.games.gamessignin.AuthScope { *; }
 
 -keepclassmembers interface com.bizsim.gplay.games.achievements.IAchievementCallback {
     void onAchievementUnlocked(java.lang.String);

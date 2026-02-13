@@ -1,6 +1,7 @@
 // Copyright (c) BizSim Game Studios. All rights reserved.
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,5 +37,11 @@ namespace BizSim.GPlay.Games
         /// Requires authentication first.
         /// </summary>
         Task<string> RequestServerSideAccessAsync(string serverClientId, bool forceRefresh = false, CancellationToken cancellationToken = default);
+
+        Task<GamesAuthResponse> RequestServerSideAccessWithScopesAsync(
+            string serverClientId,
+            bool forceRefresh,
+            List<GamesAuthScope> scopes,
+            CancellationToken cancellationToken = default);
     }
 }

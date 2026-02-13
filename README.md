@@ -2,13 +2,13 @@
 
 [![Unity 6000.3+](https://img.shields.io/badge/Unity-6000.3%2B-blue.svg)](https://unity.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.md)
-[![Version](https://img.shields.io/badge/Version-0.1.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.2.0-orange.svg)](CHANGELOG.md)
 
 **Unity bridge for Google Play Games Services v2**
 
 > **⚠️ Unofficial package.** This is a community-built Unity bridge for [Google Play Games Services v2](https://developers.google.com/games/services). It is **not** an official Google product.
 
-Version: **0.1.0** (Initial Release)
+Version: **1.2.0**
 Unity: 6000.3+
 Platform: Android
 License: MIT (package code) — see [Third-Party Licenses](#-third-party-licenses) for SDK terms
@@ -225,8 +225,8 @@ This package does **not** bundle any Google SDK binaries. Native Android depende
 
 | Dependency | Version | License |
 |-----------|---------|---------|
-| `com.google.android.gms:play-services-games-v2` | 20.1.1 | [Android SDK License Agreement](https://developer.android.com/studio/terms) |
-| `com.google.android.gms:play-services-tasks` | 18.0.2 | [Android SDK License Agreement](https://developer.android.com/studio/terms) |
+| `com.google.android.gms:play-services-games-v2` | 21.0.0 | [Android SDK License Agreement](https://developer.android.com/studio/terms) |
+| `com.google.android.gms:play-services-tasks` | 18.4.1 | [Android SDK License Agreement](https://developer.android.com/studio/terms) |
 
 By installing and using this package, you agree to the [Android Software Development Kit License Agreement](https://developer.android.com/studio/terms) and the [Google APIs Terms of Service](https://developers.google.com/terms).
 

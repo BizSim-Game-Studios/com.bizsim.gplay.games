@@ -4,11 +4,6 @@ using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
-    /// <summary>
-    /// Mock configuration for Editor testing.
-    /// Create via: Assets → Create → BizSim → Games Services Mock Config
-    /// Will be created as "DefaultGamesConfig" and auto-loaded from Resources/ folder.
-    /// </summary>
     [CreateAssetMenu(fileName = "DefaultGamesConfig", menuName = "BizSim/Games Services Mock Config", order = 100)]
     public class GamesServicesMockConfig : ScriptableObject
     {
@@ -19,11 +14,36 @@ namespace BizSim.GPlay.Games
         [Tooltip("Mock player ID (if auth succeeds)")]
         public string mockPlayerId = "mock_player_12345";
 
-        [Tooltip("Mock player display name")]
+        [Tooltip("Mock Play Games display name")]
         public string mockDisplayName = "Test Player";
 
-        [Tooltip("Mock auth error type (if auth fails) - dropdown for easier testing")]
+        [Tooltip("Mock auth error type (if auth fails)")]
         public AuthErrorType mockAuthErrorType = AuthErrorType.UserCancelled;
+
+        [Header("Profile (ID Token Claims)")]
+        [Tooltip("Simulate user granting consent for requested scopes")]
+        public bool mockConsentGranted = true;
+
+        [Tooltip("Google Account email")]
+        public string mockEmail = "testplayer@gmail.com";
+
+        [Tooltip("Is the email verified?")]
+        public bool mockEmailVerified = true;
+
+        [Tooltip("Google Account full name")]
+        public string mockFullName = "Test Player";
+
+        [Tooltip("Given (first) name")]
+        public string mockGivenName = "Test";
+
+        [Tooltip("Family (last) name")]
+        public string mockFamilyName = "Player";
+
+        [Tooltip("Google Account profile picture URL")]
+        public string mockPictureUrl = "https://lh3.googleusercontent.com/a/mock-avatar=s96-c";
+
+        [Tooltip("Account locale (e.g., en, tr, de)")]
+        public string mockLocale = "en";
 
         [Header("Simulation")]
         [Tooltip("Delay before auth completes (seconds)")]
@@ -43,9 +63,6 @@ namespace BizSim.GPlay.Games
         [Range(0f, 1f)]
         public float mockChurnProbability = 0.15f;
 
-        /// <summary>
-        /// Get error code for the selected error type.
-        /// </summary>
         public int GetAuthErrorCode()
         {
             return mockAuthErrorType switch
@@ -60,9 +77,6 @@ namespace BizSim.GPlay.Games
             };
         }
 
-        /// <summary>
-        /// Get human-readable error message for the selected error type.
-        /// </summary>
         public string GetAuthErrorMessage()
         {
             return mockAuthErrorType switch

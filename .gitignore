@@ -27,3 +27,11 @@ Build/
 .gradle/
 build/
 local.properties
+
+# Development plans (local only)
+**/sidekick-plan/
+*PLAN*.md
+*ROADMAP*.md
+
+# Research cache
+.firecrawl/

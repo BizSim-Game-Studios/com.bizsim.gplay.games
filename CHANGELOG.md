@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-02-13
+
+### Added
+- **Auth Scopes API**: New `RequestServerSideAccessWithScopesAsync()` method for requesting additional OAuth scopes (EMAIL, PROFILE, OPEN_ID) via PGS v2 21.0.0's `requestServerSideAccess(clientId, forceRefresh, List<AuthScope>)` overload
+- `GamesAuthScope` enum — maps to Java `AuthScope.EMAIL`, `AuthScope.PROFILE`, `AuthScope.OPEN_ID`
+- `GamesAuthResponse` model — wraps `AuthCode`, `GrantedScopes`, and optional `IdTokenClaims` from the scoped auth flow
+- `GamesIdTokenClaims` model — represents decoded JWT ID Token payload (sub, email, emailVerified, name, givenName, familyName, picture, locale) matching Google's `GoogleIdToken.Payload` structure
+- Java `AuthBridge.requestServerSideAccessWithScopes()` — parses scope JSON, calls PGS v2 scoped overload, returns granted scopes
+- `IAuthCallback.onServerSideAccessWithScopesSuccess/Failure` — new JNI callback methods for scoped auth flow
+- Mock provider support — scope-dependent claims simulation: EMAIL scope populates email fields, PROFILE scope populates name/picture fields, consent decline returns empty scopes with null claims
+- `mockConsentGranted` toggle in `GamesServicesMockConfig` — simulates Google consent screen accept/decline behavior
+
+### Changed
+- ProGuard rules updated for new `IAuthCallback` scoped methods and `AuthResponse`/`AuthScope` classes
+- `consumer-rules.pro` updated to mirror ProGuard changes
+
+---
+
+## [1.1.0] - 2026-02-13
+
+### Changed
+- Bumped `play-services-games-v2` from 20.1.1 to **21.0.0** — adds additional auth scope support for `requestServerSideAccess`, removes deprecated Google Sign-In and Google Drive dependencies
+- Bumped `play-services-tasks` from 18.0.2 to **18.4.1** — background thread callback handling, new `checkApiAvailability` with Executor parameter
+- Bumped `compileSdkVersion` and `targetSdkVersion` from 34 to **35** (Google Play Store requirement August 2025+)
+- Updated `GradleDependencyInjector` to inject PGS v2 21.0.0
+- Updated README version badge and third-party license table
+
+---
+
 ## [1.0.1] - 2026-02-09
 
 ### Fixed

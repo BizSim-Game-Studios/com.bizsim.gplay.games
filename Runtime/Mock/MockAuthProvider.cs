@@ -1,15 +1,12 @@
 // Copyright (c) BizSim Game Studios. All rights reserved.
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace BizSim.GPlay.Games
 {
-    /// <summary>
-    /// Mock authentication provider for Editor testing.
-    /// Returns simulated auth results based on GamesServicesMockConfig.
-    /// </summary>
     internal class MockAuthProvider : IGamesAuthProvider
     {
         private readonly GamesServicesMockConfig _config;
@@ -44,7 +41,6 @@ namespace BizSim.GPlay.Games
                 throw new GamesAuthException(error);
             }
 
-            // Simulate network delay
             if (_config.authDelaySeconds > 0)
             {
                 await Task.Delay(TimeSpan.FromSeconds(_config.authDelaySeconds), cancellationToken);
@@ -52,12 +48,9 @@ namespace BizSim.GPlay.Games
 
             if (_config.authSucceeds)
             {
-                // Simulate successful auth
                 _currentPlayer = new GamesPlayer(
                     _config.mockPlayerId,
-                    _config.mockDisplayName,
-                    null, // No banner image in mock
-                    null  // No hi-res image in mock
+                    _config.mockDisplayName
                 );
                 _isAuthenticated = true;
 
@@ -67,7 +60,6 @@ namespace BizSim.GPlay.Games
             }
             else
             {
-                // Simulate auth failure
                 var error = new GamesAuthError
                 {
                     errorCode = _config.GetAuthErrorCode(),
@@ -98,13 +90,67 @@ namespace BizSim.GPlay.Games
                 });
             }
 
-            // Simulate delay
             await Task.Delay(100, cancellationToken);
 
-            // Return mock OAuth2 code
             string mockAuthCode = $"mock_auth_code_{Guid.NewGuid():N}";
             BizSimGamesLogger.Info($"[Mock] Server-side access: {mockAuthCode}");
             return mockAuthCode;
+        }
+
+        public async Task<GamesAuthResponse> RequestServerSideAccessWithScopesAsync(
+            string serverClientId,
+            bool forceRefresh,
+            List<GamesAuthScope> scopes,
+            CancellationToken cancellationToken = default)
+        {
+            BizSimGamesLogger.Info($"[Mock] RequestServerSideAccessWithScopesAsync called (serverClientId={serverClientId}, scopes={scopes?.Count ?? 0})");
+
+            if (!_isAuthenticated)
+            {
+                throw new GamesAuthException(new GamesAuthError
+                {
+                    errorCode = 3,
+                    errorMessage = "Not authenticated - call AuthenticateAsync first",
+                    isRetryable = false
+                });
+            }
+
+            await Task.Delay(200, cancellationToken);
+
+            string mockAuthCode = $"mock_auth_code_{Guid.NewGuid():N}";
+
+            if (scopes == null || scopes.Count == 0)
+            {
+                BizSimGamesLogger.Info("[Mock] No scopes requested — returning auth code only");
+                return new GamesAuthResponse(mockAuthCode, new List<GamesAuthScope>());
+            }
+
+            if (!_config.mockConsentGranted)
+            {
+                BizSimGamesLogger.Info("[Mock] Consent DECLINED — returning auth code with empty scopes, no claims");
+                return new GamesAuthResponse(mockAuthCode, new List<GamesAuthScope>());
+            }
+
+            var grantedScopes = new List<GamesAuthScope>(scopes);
+
+            bool hasEmail = grantedScopes.Contains(GamesAuthScope.Email);
+            bool hasProfile = grantedScopes.Contains(GamesAuthScope.Profile);
+
+            var claims = new GamesIdTokenClaims(
+                sub: _config.mockPlayerId,
+                email: hasEmail ? _config.mockEmail : null,
+                emailVerified: hasEmail && _config.mockEmailVerified,
+                name: hasProfile ? _config.mockFullName : null,
+                givenName: hasProfile ? _config.mockGivenName : null,
+                familyName: hasProfile ? _config.mockFamilyName : null,
+                picture: hasProfile ? _config.mockPictureUrl : null,
+                locale: hasProfile ? _config.mockLocale : null
+            );
+
+            var response = new GamesAuthResponse(mockAuthCode, grantedScopes, claims);
+
+            BizSimGamesLogger.Info($"[Mock] Scoped access granted: {grantedScopes.Count} scopes, claims={claims}");
+            return response;
         }
     }
 }

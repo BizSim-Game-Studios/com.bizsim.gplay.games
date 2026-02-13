@@ -84,5 +84,25 @@ namespace BizSim.GPlay.Games
                 _controller.OnServerSideAccessFailure(errorCode, errorMessage);
             });
         }
+
+        void onServerSideAccessWithScopesSuccess(string authCode, string grantedScopesJson)
+        {
+            BizSimGamesLogger.Verbose("[Callback] onServerSideAccessWithScopesSuccess");
+
+            UnityMainThreadDispatcher.Enqueue(() =>
+            {
+                _controller.OnScopedAccessSuccess(authCode, grantedScopesJson);
+            });
+        }
+
+        void onServerSideAccessWithScopesFailure(int errorCode, string errorMessage)
+        {
+            BizSimGamesLogger.Verbose($"[Callback] onServerSideAccessWithScopesFailure: code={errorCode}, message={errorMessage}");
+
+            UnityMainThreadDispatcher.Enqueue(() =>
+            {
+                _controller.OnScopedAccessFailure(errorCode, errorMessage);
+            });
+        }
     }
 }

@@ -37,4 +37,8 @@ public interface IAuthCallback {
      * @param errorMessage Human-readable error message
      */
     void onServerSideAccessFailure(int errorCode, String errorMessage);
+
+    void onServerSideAccessWithScopesSuccess(String authCode, String grantedScopesJson);
+
+    void onServerSideAccessWithScopesFailure(int errorCode, String errorMessage);
 }

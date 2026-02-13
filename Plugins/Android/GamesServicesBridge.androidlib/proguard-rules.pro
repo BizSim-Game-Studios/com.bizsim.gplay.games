@@ -17,6 +17,8 @@
     void onAuthFailure(int, java.lang.String);
     void onServerSideAccessSuccess(java.lang.String);
     void onServerSideAccessFailure(int, java.lang.String);
+    void onServerSideAccessWithScopesSuccess(java.lang.String, java.lang.String);
+    void onServerSideAccessWithScopesFailure(int, java.lang.String);
 }
 
 -keepclassmembers interface com.bizsim.gplay.games.achievements.IAchievementCallback {
@@ -75,6 +77,8 @@
 # Keep common wrapper classes
 -keep class com.google.android.gms.games.AnnotatedData { *; }
 -keep class com.google.android.gms.games.AuthenticationResult { *; }
+-keep class com.google.android.gms.games.gamessignin.AuthResponse { *; }
+-keep class com.google.android.gms.games.gamessignin.AuthScope { *; }
 -keep class com.google.android.gms.games.PlayGames { *; }
 -keep class com.google.android.gms.games.PlayGamesSdk { *; }
 

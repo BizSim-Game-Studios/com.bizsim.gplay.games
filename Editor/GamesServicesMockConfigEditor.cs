@@ -1,11 +1,10 @@
+// Copyright (c) BizSim Game Studios. All rights reserved.
+
 using UnityEditor;
 using UnityEngine;
 
 namespace BizSim.GPlay.Games.Editor
 {
-    /// <summary>
-    /// Custom inspector for GamesServicesMockConfig with card-based layout.
-    /// </summary>
     [CustomEditor(typeof(GamesServicesMockConfig))]
     public class GamesServicesMockConfigEditor : UnityEditor.Editor
     {
@@ -13,6 +12,14 @@ namespace BizSim.GPlay.Games.Editor
         private SerializedProperty mockPlayerId;
         private SerializedProperty mockDisplayName;
         private SerializedProperty mockAuthErrorType;
+        private SerializedProperty mockConsentGranted;
+        private SerializedProperty mockEmail;
+        private SerializedProperty mockEmailVerified;
+        private SerializedProperty mockFullName;
+        private SerializedProperty mockGivenName;
+        private SerializedProperty mockFamilyName;
+        private SerializedProperty mockPictureUrl;
+        private SerializedProperty mockLocale;
         private SerializedProperty authDelaySeconds;
         private SerializedProperty mockUnlockedCount;
         private SerializedProperty mockScore;
@@ -24,6 +31,14 @@ namespace BizSim.GPlay.Games.Editor
             mockPlayerId = serializedObject.FindProperty("mockPlayerId");
             mockDisplayName = serializedObject.FindProperty("mockDisplayName");
             mockAuthErrorType = serializedObject.FindProperty("mockAuthErrorType");
+            mockConsentGranted = serializedObject.FindProperty("mockConsentGranted");
+            mockEmail = serializedObject.FindProperty("mockEmail");
+            mockEmailVerified = serializedObject.FindProperty("mockEmailVerified");
+            mockFullName = serializedObject.FindProperty("mockFullName");
+            mockGivenName = serializedObject.FindProperty("mockGivenName");
+            mockFamilyName = serializedObject.FindProperty("mockFamilyName");
+            mockPictureUrl = serializedObject.FindProperty("mockPictureUrl");
+            mockLocale = serializedObject.FindProperty("mockLocale");
             authDelaySeconds = serializedObject.FindProperty("authDelaySeconds");
             mockUnlockedCount = serializedObject.FindProperty("mockUnlockedCount");
             mockScore = serializedObject.FindProperty("mockScore");
@@ -36,32 +51,24 @@ namespace BizSim.GPlay.Games.Editor
 
             var config = (GamesServicesMockConfig)target;
 
-            // Header
             DrawPackageHeader();
-
             EditorGUILayout.Space(10);
 
-            // Authentication Card
             DrawAuthenticationCard(config);
-
             EditorGUILayout.Space(5);
 
-            // Achievements Card
+            DrawProfileCard();
+            EditorGUILayout.Space(5);
+
             DrawAchievementsCard();
-
             EditorGUILayout.Space(5);
 
-            // Leaderboards Card
             DrawLeaderboardsCard();
-
             EditorGUILayout.Space(5);
 
-            // Player Stats Card
             DrawPlayerStatsCard();
-
             EditorGUILayout.Space(10);
 
-            // Usage Info
             DrawUsageInfo();
 
             serializedObject.ApplyModifiedProperties();
@@ -80,22 +87,19 @@ namespace BizSim.GPlay.Games.Editor
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-            GUILayout.Label("🔐 Authentication", EditorStyles.boldLabel);
+            GUILayout.Label("Authentication", EditorStyles.boldLabel);
             EditorGUILayout.Space(5);
 
-            // Success toggle
             EditorGUILayout.PropertyField(authSucceeds, new GUIContent("Auth Succeeds"));
-
             EditorGUILayout.Space(3);
 
             if (authSucceeds.boolValue)
             {
-                // Success path
                 GUI.color = new Color(0.8f, 1f, 0.8f);
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 GUI.color = Color.white;
 
-                EditorGUILayout.LabelField("✓ Success Scenario", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("Success Scenario", EditorStyles.miniLabel);
                 EditorGUILayout.PropertyField(mockPlayerId, new GUIContent("Player ID"));
                 EditorGUILayout.PropertyField(mockDisplayName, new GUIContent("Display Name"));
 
@@ -103,12 +107,11 @@ namespace BizSim.GPlay.Games.Editor
             }
             else
             {
-                // Error path
                 GUI.color = new Color(1f, 0.8f, 0.8f);
                 EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                 GUI.color = Color.white;
 
-                EditorGUILayout.LabelField("✗ Error Scenario", EditorStyles.miniLabel);
+                EditorGUILayout.LabelField("Error Scenario", EditorStyles.miniLabel);
                 EditorGUILayout.PropertyField(mockAuthErrorType, new GUIContent("Error Type"));
 
                 EditorGUILayout.Space(3);
@@ -125,18 +128,70 @@ namespace BizSim.GPlay.Games.Editor
             EditorGUILayout.EndVertical();
         }
 
+        private void DrawProfileCard()
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+            GUILayout.Label("Profile (ID Token Claims)", EditorStyles.boldLabel);
+            EditorGUILayout.Space(3);
+
+            EditorGUILayout.HelpBox(
+                "Simulates the decoded JWT ID Token payload returned after " +
+                "server-side auth code exchange. Claims are scope-dependent:\n" +
+                "  EMAIL scope: email, emailVerified\n" +
+                "  PROFILE scope: name, picture, locale\n" +
+                "  OPEN_ID scope: sub (always = Player ID)",
+                MessageType.Info);
+
+            EditorGUILayout.Space(5);
+
+            EditorGUILayout.PropertyField(mockConsentGranted, new GUIContent("Consent Granted"));
+
+            if (mockConsentGranted.boolValue)
+            {
+                GUI.color = new Color(0.8f, 1f, 0.8f);
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                GUI.color = Color.white;
+
+                EditorGUILayout.LabelField("EMAIL scope claims", EditorStyles.miniLabel);
+                EditorGUILayout.PropertyField(mockEmail, new GUIContent("Email"));
+                EditorGUILayout.PropertyField(mockEmailVerified, new GUIContent("Email Verified"));
+
+                EditorGUILayout.Space(5);
+                EditorGUILayout.LabelField("PROFILE scope claims", EditorStyles.miniLabel);
+                EditorGUILayout.PropertyField(mockFullName, new GUIContent("Full Name"));
+                EditorGUILayout.PropertyField(mockGivenName, new GUIContent("Given Name"));
+                EditorGUILayout.PropertyField(mockFamilyName, new GUIContent("Family Name"));
+                EditorGUILayout.PropertyField(mockPictureUrl, new GUIContent("Picture URL"));
+                EditorGUILayout.PropertyField(mockLocale, new GUIContent("Locale"));
+
+                EditorGUILayout.EndVertical();
+            }
+            else
+            {
+                GUI.color = new Color(1f, 0.9f, 0.7f);
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                GUI.color = Color.white;
+
+                EditorGUILayout.LabelField(
+                    "Consent declined: auth code will still be returned, " +
+                    "but grantedScopes will be empty and IdTokenClaims will be null.",
+                    EditorStyles.wordWrappedMiniLabel);
+
+                EditorGUILayout.EndVertical();
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+
         private void DrawAchievementsCard()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-            GUILayout.Label("🏆 Achievements", EditorStyles.boldLabel);
+            GUILayout.Label("Achievements", EditorStyles.boldLabel);
             EditorGUILayout.Space(5);
 
             EditorGUILayout.PropertyField(mockUnlockedCount, new GUIContent("Unlocked Count"));
-
-            EditorGUILayout.Space(3);
-            EditorGUILayout.LabelField("ℹ️ Mock unlocked achievements count for testing UI.",
-                EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.EndVertical();
         }
@@ -145,14 +200,10 @@ namespace BizSim.GPlay.Games.Editor
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-            GUILayout.Label("📊 Leaderboards", EditorStyles.boldLabel);
+            GUILayout.Label("Leaderboards", EditorStyles.boldLabel);
             EditorGUILayout.Space(5);
 
             EditorGUILayout.PropertyField(mockScore, new GUIContent("Mock Score"));
-
-            EditorGUILayout.Space(3);
-            EditorGUILayout.LabelField("ℹ️ Mock leaderboard score for testing score submission.",
-                EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.EndVertical();
         }
@@ -161,14 +212,10 @@ namespace BizSim.GPlay.Games.Editor
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-            GUILayout.Label("📈 Player Stats", EditorStyles.boldLabel);
+            GUILayout.Label("Player Stats", EditorStyles.boldLabel);
             EditorGUILayout.Space(5);
 
             EditorGUILayout.PropertyField(mockChurnProbability, new GUIContent("Churn Probability"));
-
-            EditorGUILayout.Space(3);
-            EditorGUILayout.LabelField("ℹ️ Mock churn prediction for testing player stats API.",
-                EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.EndVertical();
         }
@@ -177,10 +224,10 @@ namespace BizSim.GPlay.Games.Editor
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
-            EditorGUILayout.LabelField("📖 Usage", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Usage", EditorStyles.boldLabel);
             EditorGUILayout.Space(3);
 
-            EditorGUILayout.LabelField("1. Create this config: Assets → Create → BizSim → Games Services Mock Config",
+            EditorGUILayout.LabelField("1. Create this config: Assets > Create > BizSim > Games Services Mock Config",
                 EditorStyles.wordWrappedMiniLabel);
             EditorGUILayout.LabelField("2. Name it 'DefaultGamesConfig' (will auto-load from Resources/)",
                 EditorStyles.wordWrappedMiniLabel);

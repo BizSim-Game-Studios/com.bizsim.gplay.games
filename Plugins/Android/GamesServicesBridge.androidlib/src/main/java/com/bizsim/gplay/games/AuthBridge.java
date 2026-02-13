@@ -11,7 +11,15 @@ import com.google.android.gms.games.GamesSignInClient;
 import com.google.android.gms.games.PlayGames;
 import com.google.android.gms.games.Player;
 import com.google.android.gms.games.PlayersClient;
+import com.google.android.gms.games.gamessignin.AuthResponse;
+import com.google.android.gms.games.gamessignin.AuthScope;
 import com.google.android.gms.tasks.Task;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * JNI bridge for Google Play Games authentication (PGS v2).
@@ -123,6 +131,65 @@ public class AuthBridge {
                     Log.e(TAG, "Server-side access failed: " + exception.getMessage());
                     callback.onServerSideAccessFailure(ERROR_SIGN_IN_FAILED,
                             exception.getMessage() != null ? exception.getMessage() : "Server-side access failed");
+                });
+    }
+
+    public void requestServerSideAccessWithScopes(String serverClientId, boolean forceRefresh, String scopesJson) {
+        if (callback == null) {
+            Log.e(TAG, "requestServerSideAccessWithScopes() called but callback is null");
+            return;
+        }
+
+        Log.d(TAG, "Requesting server-side access with scopes (clientId=" + serverClientId +
+                ", forceRefresh=" + forceRefresh + ", scopes=" + scopesJson + ")");
+
+        List<AuthScope> scopes = new ArrayList<>();
+        try {
+            JSONArray arr = new JSONArray(scopesJson);
+            for (int i = 0; i < arr.length(); i++) {
+                String scopeName = arr.getString(i);
+                switch (scopeName) {
+                    case "EMAIL":
+                        scopes.add(AuthScope.EMAIL);
+                        break;
+                    case "PROFILE":
+                        scopes.add(AuthScope.PROFILE);
+                        break;
+                    case "OPEN_ID":
+                        scopes.add(AuthScope.OPEN_ID);
+                        break;
+                    default:
+                        Log.w(TAG, "Unknown auth scope: " + scopeName);
+                        break;
+                }
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Failed to parse scopes JSON: " + e.getMessage());
+            callback.onServerSideAccessWithScopesFailure(ERROR_SIGN_IN_FAILED, "Invalid scopes JSON: " + e.getMessage());
+            return;
+        }
+
+        signInClient.requestServerSideAccess(serverClientId, forceRefresh, scopes)
+                .addOnSuccessListener(activity, authResponse -> {
+                    String authCode = authResponse.getAuthCode();
+                    List<AuthScope> grantedScopes = authResponse.getGrantedScopes();
+
+                    JSONArray grantedArray = new JSONArray();
+                    if (grantedScopes != null) {
+                        for (AuthScope scope : grantedScopes) {
+                            if (scope.equals(AuthScope.EMAIL)) grantedArray.put("EMAIL");
+                            else if (scope.equals(AuthScope.PROFILE)) grantedArray.put("PROFILE");
+                            else if (scope.equals(AuthScope.OPEN_ID)) grantedArray.put("OPEN_ID");
+                        }
+                    }
+
+                    Log.d(TAG, "Server-side access with scopes granted (scopes=" + grantedArray + ")");
+                    callback.onServerSideAccessWithScopesSuccess(authCode, grantedArray.toString());
+                })
+                .addOnFailureListener(activity, exception -> {
+                    Log.e(TAG, "Server-side access with scopes failed: " + exception.getMessage());
+                    callback.onServerSideAccessWithScopesFailure(ERROR_SIGN_IN_FAILED,
+                            exception.getMessage() != null ? exception.getMessage() : "Server-side access with scopes failed");
                 });
     }
 

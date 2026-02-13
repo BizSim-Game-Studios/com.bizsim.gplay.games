@@ -8,7 +8,7 @@ repository (`maven.google.com`).
 
 ## Google Play Games Services v2
 
-- **Library:** `com.google.android.gms:play-services-games-v2:20.1.1`
+- **Library:** `com.google.android.gms:play-services-games-v2:21.0.0`
 - **Copyright:** Copyright Google LLC
 - **License:** [Android Software Development Kit License Agreement](https://developer.android.com/studio/terms)
   (in addition to the [Google APIs Terms of Service](https://developers.google.com/terms))
@@ -35,7 +35,7 @@ Your app must comply with:
 
 ## Google Play Tasks API
 
-- **Library:** `com.google.android.gms:play-services-tasks:18.0.2`
+- **Library:** `com.google.android.gms:play-services-tasks:18.4.1`
 - **Copyright:** Copyright Google LLC
 - **License:** [Android Software Development Kit License Agreement](https://developer.android.com/studio/terms)
 

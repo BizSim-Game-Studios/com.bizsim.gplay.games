@@ -1,6 +1,7 @@
 // Copyright (c) BizSim Game Studios. All rights reserved.
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -17,6 +18,7 @@ namespace BizSim.GPlay.Games
         private AuthCallbackProxy _callbackProxy;
         private TaskCompletionSource<GamesPlayer> _authTaskSource;
         private TaskCompletionSource<string> _serverAccessTaskSource;
+        private TaskCompletionSource<GamesAuthResponse> _scopedAccessTaskSource;
         private CancellationTokenSource _destroyTokenSource;
 
         private GamesPlayer _currentPlayer;
@@ -219,6 +221,131 @@ namespace BizSim.GPlay.Games
 
             BizSimGamesLogger.Warning($"Server-side access failure: {error}");
             _serverAccessTaskSource?.TrySetException(new GamesAuthException(error));
+        }
+
+        public async Task<GamesAuthResponse> RequestServerSideAccessWithScopesAsync(
+            string serverClientId,
+            bool forceRefresh,
+            List<GamesAuthScope> scopes,
+            CancellationToken cancellationToken = default)
+        {
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            if (!_isAuthenticated)
+            {
+                throw new GamesAuthException(new GamesAuthError
+                {
+                    errorCode = 3,
+                    errorMessage = "Not authenticated - call AuthenticateAsync first",
+                    isRetryable = false
+                });
+            }
+
+            if (_authBridge == null)
+            {
+                throw new GamesAuthException(new GamesAuthError
+                {
+                    errorCode = -100,
+                    errorMessage = "JNI bridge not initialized",
+                    isRetryable = false
+                });
+            }
+
+            _scopedAccessTaskSource = new TaskCompletionSource<GamesAuthResponse>();
+
+            using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _destroyTokenSource.Token))
+            using (linkedCts.Token.Register(() => _scopedAccessTaskSource?.TrySetCanceled()))
+            {
+                try
+                {
+                    string scopesJson = ScopesToJson(scopes);
+                    BizSimGamesLogger.Info($"Requesting server-side access with scopes (clientId={serverClientId}, forceRefresh={forceRefresh}, scopes={scopesJson})");
+                    _authBridge.Call("requestServerSideAccessWithScopes", serverClientId, forceRefresh, scopesJson);
+
+                    return await _scopedAccessTaskSource.Task;
+                }
+                catch (OperationCanceledException)
+                {
+                    BizSimGamesLogger.Warning("Scoped server-side access request cancelled");
+                    throw;
+                }
+            }
+            #else
+            await Task.CompletedTask;
+            throw new GamesAuthException(new GamesAuthError
+            {
+                errorCode = -1,
+                errorMessage = "Not available on this platform",
+                isRetryable = false
+            });
+            #endif
+        }
+
+        internal void OnScopedAccessSuccess(string authCode, string grantedScopesJson)
+        {
+            var grantedScopes = ParseScopesJson(grantedScopesJson);
+            var response = new GamesAuthResponse(authCode, grantedScopes);
+
+            BizSimGamesLogger.Info($"Scoped server-side access granted (scopes={grantedScopesJson})");
+            _scopedAccessTaskSource?.TrySetResult(response);
+        }
+
+        internal void OnScopedAccessFailure(int errorCode, string errorMessage)
+        {
+            var error = new GamesAuthError
+            {
+                errorCode = errorCode,
+                errorMessage = errorMessage,
+                isRetryable = false
+            };
+
+            BizSimGamesLogger.Warning($"Scoped server-side access failure: {error}");
+            _scopedAccessTaskSource?.TrySetException(new GamesAuthException(error));
+        }
+
+        private static string ScopesToJson(List<GamesAuthScope> scopes)
+        {
+            if (scopes == null || scopes.Count == 0)
+                return "[]";
+
+            var parts = new List<string>(scopes.Count);
+            foreach (var scope in scopes)
+            {
+                switch (scope)
+                {
+                    case GamesAuthScope.Email: parts.Add("\"EMAIL\""); break;
+                    case GamesAuthScope.Profile: parts.Add("\"PROFILE\""); break;
+                    case GamesAuthScope.OpenId: parts.Add("\"OPEN_ID\""); break;
+                    default:
+                        BizSimGamesLogger.Warning($"Unknown GamesAuthScope value: {scope}");
+                        break;
+                }
+            }
+            return "[" + string.Join(",", parts) + "]";
+        }
+
+        private static List<GamesAuthScope> ParseScopesJson(string json)
+        {
+            var result = new List<GamesAuthScope>();
+            if (string.IsNullOrEmpty(json))
+                return result;
+
+            string trimmed = json.Trim().TrimStart('[').TrimEnd(']');
+            if (string.IsNullOrEmpty(trimmed))
+                return result;
+
+            string[] items = trimmed.Split(',');
+            foreach (string item in items)
+            {
+                string cleaned = item.Trim().Trim('"');
+                switch (cleaned)
+                {
+                    case "EMAIL": result.Add(GamesAuthScope.Email); break;
+                    case "PROFILE": result.Add(GamesAuthScope.Profile); break;
+                    case "OPEN_ID": result.Add(GamesAuthScope.OpenId); break;
+                }
+            }
+
+            return result;
         }
 
         private static AndroidJavaObject GetUnityActivity()
