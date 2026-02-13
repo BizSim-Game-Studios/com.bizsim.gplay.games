@@ -9,7 +9,7 @@ namespace BizSim.GPlay.Games
 {
     internal class MockAuthProvider : IGamesAuthProvider
     {
-        private readonly GamesServicesMockConfig _config;
+        private readonly GamesServicesConfig.MockSettings _mock;
         private GamesPlayer _currentPlayer;
         private bool _isAuthenticated;
 
@@ -19,16 +19,16 @@ namespace BizSim.GPlay.Games
         public bool IsAuthenticated => _isAuthenticated;
         public GamesPlayer CurrentPlayer => _currentPlayer;
 
-        public MockAuthProvider(GamesServicesMockConfig config)
+        public MockAuthProvider(GamesServicesConfig.MockSettings mock)
         {
-            _config = config;
+            _mock = mock;
         }
 
         public async Task<GamesPlayer> AuthenticateAsync(CancellationToken cancellationToken = default)
         {
             BizSimGamesLogger.Info("[Mock] AuthenticateAsync called");
 
-            if (_config == null)
+            if (_mock == null)
             {
                 BizSimGamesLogger.Warning("[Mock] No config - simulating auth failure");
                 var error = new GamesAuthError
@@ -41,16 +41,16 @@ namespace BizSim.GPlay.Games
                 throw new GamesAuthException(error);
             }
 
-            if (_config.authDelaySeconds > 0)
+            if (_mock.authDelaySeconds > 0)
             {
-                await Task.Delay(TimeSpan.FromSeconds(_config.authDelaySeconds), cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(_mock.authDelaySeconds), cancellationToken);
             }
 
-            if (_config.authSucceeds)
+            if (_mock.authSucceeds)
             {
                 _currentPlayer = new GamesPlayer(
-                    _config.mockPlayerId,
-                    _config.mockDisplayName
+                    _mock.mockPlayerId,
+                    _mock.mockDisplayName
                 );
                 _isAuthenticated = true;
 
@@ -62,8 +62,8 @@ namespace BizSim.GPlay.Games
             {
                 var error = new GamesAuthError
                 {
-                    errorCode = _config.GetAuthErrorCode(),
-                    errorMessage = _config.GetAuthErrorMessage(),
+                    errorCode = _mock.GetAuthErrorCode(),
+                    errorMessage = _mock.GetAuthErrorMessage(),
                     isRetryable = false
                 };
 
@@ -125,7 +125,7 @@ namespace BizSim.GPlay.Games
                 return new GamesAuthResponse(mockAuthCode, new List<GamesAuthScope>());
             }
 
-            if (!_config.mockConsentGranted)
+            if (!_mock.mockConsentGranted)
             {
                 BizSimGamesLogger.Info("[Mock] Consent DECLINED — returning auth code with empty scopes, no claims");
                 return new GamesAuthResponse(mockAuthCode, new List<GamesAuthScope>());
@@ -137,14 +137,14 @@ namespace BizSim.GPlay.Games
             bool hasProfile = grantedScopes.Contains(GamesAuthScope.Profile);
 
             var claims = new GamesIdTokenClaims(
-                sub: _config.mockPlayerId,
-                email: hasEmail ? _config.mockEmail : null,
-                emailVerified: hasEmail && _config.mockEmailVerified,
-                name: hasProfile ? _config.mockFullName : null,
-                givenName: hasProfile ? _config.mockGivenName : null,
-                familyName: hasProfile ? _config.mockFamilyName : null,
-                picture: hasProfile ? _config.mockPictureUrl : null,
-                locale: hasProfile ? _config.mockLocale : null
+                sub: _mock.mockPlayerId,
+                email: hasEmail ? _mock.mockEmail : null,
+                emailVerified: hasEmail && _mock.mockEmailVerified,
+                name: hasProfile ? _mock.mockFullName : null,
+                givenName: hasProfile ? _mock.mockGivenName : null,
+                familyName: hasProfile ? _mock.mockFamilyName : null,
+                picture: hasProfile ? _mock.mockPictureUrl : null,
+                locale: hasProfile ? _mock.mockLocale : null
             );
 
             var response = new GamesAuthResponse(mockAuthCode, grantedScopes, claims);

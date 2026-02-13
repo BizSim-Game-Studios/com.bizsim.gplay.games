@@ -78,9 +78,9 @@ namespace BizSim.GPlay.Games.Editor
         {
             EditorGUILayout.LabelField("Games Services Mock Configuration", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "This mock config is used ONLY in Unity Editor for testing without real Google Play authentication. " +
-                "On device, the real Google Play Games Services will be used.",
-                MessageType.Info);
+                "DEPRECATED: Use GamesServicesConfig instead (Create > BizSim > Google Play Games > Services Config). " +
+                "This config will be auto-migrated at runtime but will be removed in v1.4.0.",
+                MessageType.Warning);
         }
 
         private void DrawAuthenticationCard(GamesServicesMockConfig config)

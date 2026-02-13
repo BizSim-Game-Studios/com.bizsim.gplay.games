@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-02-13
+
+### Added
+- **Unified Configuration System** — `GamesServicesConfig` ScriptableObject replaces dual-config confusion with single asset containing service toggles, Sidekick settings, quality checklist options, and editor mock data
+- `SidekickReadiness` static evaluator — `SidekickReadiness.Evaluate(config)` returns `SidekickTier` (None, Tier1, Tier2) based on enabled services and metadata requirements
+- `GamesServicesManager.Config` static accessor — provides current config to all services
+- `GamesServicesManager.SidekickStatus` static accessor — returns current Sidekick tier
+- **3-tier config resolution** — (1) new `GamesServicesConfig` from Resources, (2) legacy `DefaultGamesConfig` auto-migration, (3) hardcoded defaults with all services enabled
+- Domain Reload safety — runtime-created ScriptableObjects use `HideFlags.HideAndDontSave`
+
+### Changed
+- Mock providers now accept `GamesServicesConfig.MockSettings` instead of `GamesServicesMockConfig`
+- `GamesServicesManager.InitializeServices()` uses conditional service initialization based on config toggles
+- Service provider fields are only initialized when their corresponding `enable*` toggle is true
+
+### Deprecated
+- `GamesServicesMockConfig` — marked `[Obsolete]`, will be removed in v1.4.0. Use `GamesServicesConfig` instead.
+
+---
+
 ## [1.2.1] - 2026-02-13
 
 ### Fixed

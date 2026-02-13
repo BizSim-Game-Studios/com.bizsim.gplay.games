@@ -14,7 +14,7 @@ namespace BizSim.GPlay.Games
         public event Action<GamesStatsError> OnStatsError;
 #pragma warning restore CS0067
 
-        public MockStatsProvider(GamesServicesMockConfig config)
+        public MockStatsProvider(GamesServicesConfig.MockSettings mock)
         {
             BizSimGamesLogger.Info("MockStatsProvider initialized");
         }

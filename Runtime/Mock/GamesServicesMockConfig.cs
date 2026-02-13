@@ -1,9 +1,11 @@
 // Copyright (c) BizSim Game Studios. All rights reserved.
 
+using System;
 using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
+    [Obsolete("Use GamesServicesConfig (Create > BizSim > Google Play Games > Services Config) instead. Will be removed in v1.4.0.")]
     [CreateAssetMenu(fileName = "DefaultGamesConfig", menuName = "BizSim/Games Services Mock Config", order = 100)]
     public class GamesServicesMockConfig : ScriptableObject
     {

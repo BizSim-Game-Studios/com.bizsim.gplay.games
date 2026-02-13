@@ -4,14 +4,6 @@ using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
-    /// <summary>
-    /// Facade for all Google Play Games Services.
-    /// Automatically initializes and provides access to Auth, Achievements, Leaderboards, SavedGames, and PlayerStats.
-    ///
-    /// Platform Detection:
-    /// - Android (device): Uses JNI bridge to native PGS v2 SDK
-    /// - Editor: Auto-loads mock providers from Resources/DefaultGamesConfig
-    /// </summary>
     [DefaultExecutionOrder(-999)]
     public class GamesServicesManager : MonoBehaviour
     {
@@ -19,15 +11,13 @@ namespace BizSim.GPlay.Games
         private static readonly object _lock = new object();
         private static bool _isQuitting;
 
+        private GamesServicesConfig _config;
         private IGamesAuthProvider _authProvider;
         private IGamesAchievementProvider _achievementsProvider;
         private IGamesLeaderboardProvider _leaderboardsProvider;
         private IGamesCloudSaveProvider _cloudSaveProvider;
         private IGamesStatsProvider _statsProvider;
 
-        /// <summary>
-        /// Singleton instance (auto-creates on first access).
-        /// </summary>
         public static GamesServicesManager Instance
         {
             get
@@ -48,29 +38,12 @@ namespace BizSim.GPlay.Games
             }
         }
 
-        /// <summary>
-        /// Authentication service.
-        /// </summary>
+        public static GamesServicesConfig Config => Instance?._config;
+        public static SidekickTier SidekickStatus => SidekickReadiness.Evaluate(Instance?._config);
         public static IGamesAuthProvider Auth => Instance?._authProvider;
-
-        /// <summary>
-        /// Achievements service (unlock, increment, reveal, show UI).
-        /// </summary>
         public static IGamesAchievementProvider Achievements => Instance?._achievementsProvider;
-
-        /// <summary>
-        /// Leaderboards service (submit scores, show UI, load rankings).
-        /// </summary>
         public static IGamesLeaderboardProvider Leaderboards => Instance?._leaderboardsProvider;
-
-        /// <summary>
-        /// Cloud Save service (SavedGames / Snapshots API).
-        /// </summary>
         public static IGamesCloudSaveProvider CloudSave => Instance?._cloudSaveProvider;
-
-        /// <summary>
-        /// Player Stats service (engagement metrics, churn probability, etc.).
-        /// </summary>
         public static IGamesStatsProvider Stats => Instance?._statsProvider;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -105,46 +78,94 @@ namespace BizSim.GPlay.Games
 
         private void InitializeServices()
         {
-            #if UNITY_ANDROID && !UNITY_EDITOR
-                // Production: JNI bridge to PGS v2 SDK
-                BizSimGamesLogger.Info("Platform: Android (JNI Bridge)");
-                _authProvider = new GamesAuthController();
-                _achievementsProvider = new GamesAchievementController();
-                _leaderboardsProvider = new GamesLeaderboardController();
-                _cloudSaveProvider = new GamesCloudSaveController();
-                _statsProvider = new GamesStatsController();
-            #else
-                // Editor: Auto-load mock provider
-                BizSimGamesLogger.Info("Platform: Editor (Mock Provider)");
+            ResolveConfig();
 
-                var mockConfig = Resources.Load<GamesServicesMockConfig>("DefaultGamesConfig");
-                if (mockConfig != null)
-                {
-                    _authProvider = new MockAuthProvider(mockConfig);
-                    _achievementsProvider = new MockAchievementProvider(mockConfig);
-                    _leaderboardsProvider = new MockLeaderboardProvider(mockConfig);
-                    _cloudSaveProvider = new MockCloudSaveProvider(mockConfig);
-                    _statsProvider = new MockStatsProvider(mockConfig);
-                    BizSimGamesLogger.Info("Mock providers loaded from Resources/DefaultGamesConfig");
-                }
-                else
-                {
-                    BizSimGamesLogger.Warning("No mock config found at Resources/DefaultGamesConfig - services unavailable in Editor");
-                    _authProvider = new MockAuthProvider(null); // Fallback: always fails
-                    _achievementsProvider = new MockAchievementProvider(CreateFallbackConfig());
-                    _leaderboardsProvider = new MockLeaderboardProvider(CreateFallbackConfig());
-                    _cloudSaveProvider = new MockCloudSaveProvider(CreateFallbackConfig());
-                    _statsProvider = new MockStatsProvider(CreateFallbackConfig());
-                }
+            #if UNITY_ANDROID && !UNITY_EDITOR
+                BizSimGamesLogger.Info("Platform: Android (JNI Bridge)");
+                if (_config.enableAuth)
+                    _authProvider = new GamesAuthController();
+                if (_config.enableAchievements)
+                    _achievementsProvider = new GamesAchievementController();
+                if (_config.enableLeaderboards)
+                    _leaderboardsProvider = new GamesLeaderboardController();
+                if (_config.enableCloudSave)
+                    _cloudSaveProvider = new GamesCloudSaveController();
+                if (_config.enableStats)
+                    _statsProvider = new GamesStatsController();
+            #else
+                BizSimGamesLogger.Info("Platform: Editor (Mock Provider)");
+                var mockData = _config.editorMock;
+                if (_config.enableAuth)
+                    _authProvider = new MockAuthProvider(mockData);
+                if (_config.enableAchievements)
+                    _achievementsProvider = new MockAchievementProvider(mockData);
+                if (_config.enableLeaderboards)
+                    _leaderboardsProvider = new MockLeaderboardProvider(mockData);
+                if (_config.enableCloudSave)
+                    _cloudSaveProvider = new MockCloudSaveProvider(mockData);
+                if (_config.enableStats)
+                    _statsProvider = new MockStatsProvider(mockData);
             #endif
         }
 
-        private GamesServicesMockConfig CreateFallbackConfig()
+        private void ResolveConfig()
         {
-            var config = ScriptableObject.CreateInstance<GamesServicesMockConfig>();
-            config.mockPlayerId = "editor_player_fallback";
-            config.mockDisplayName = "Editor Player";
+            _config = Resources.Load<GamesServicesConfig>("GamesServicesConfig");
+
+            #pragma warning disable CS0618
+            if (_config == null)
+            {
+                var legacyMock = Resources.Load<GamesServicesMockConfig>("DefaultGamesConfig");
+                if (legacyMock != null)
+                {
+                    BizSimGamesLogger.Warning("Using legacy DefaultGamesConfig. " +
+                        "Create a GamesServicesConfig asset for full Sidekick support.");
+                    _config = CreateConfigFromLegacy(legacyMock);
+                }
+            }
+            #pragma warning restore CS0618
+
+            if (_config == null)
+            {
+                _config = ScriptableObject.CreateInstance<GamesServicesConfig>();
+            }
+
+            if (_config.hideFlags == HideFlags.None && !IsPersistedAsset(_config))
+                _config.hideFlags = HideFlags.HideAndDontSave;
+        }
+
+        #pragma warning disable CS0618
+        private GamesServicesConfig CreateConfigFromLegacy(GamesServicesMockConfig legacyMock)
+        {
+            var config = ScriptableObject.CreateInstance<GamesServicesConfig>();
+            config.hideFlags = HideFlags.HideAndDontSave;
+            config.editorMock.authSucceeds = legacyMock.authSucceeds;
+            config.editorMock.mockPlayerId = legacyMock.mockPlayerId;
+            config.editorMock.mockDisplayName = legacyMock.mockDisplayName;
+            config.editorMock.mockAuthErrorType = legacyMock.mockAuthErrorType;
+            config.editorMock.mockConsentGranted = legacyMock.mockConsentGranted;
+            config.editorMock.mockEmail = legacyMock.mockEmail;
+            config.editorMock.mockEmailVerified = legacyMock.mockEmailVerified;
+            config.editorMock.mockFullName = legacyMock.mockFullName;
+            config.editorMock.mockGivenName = legacyMock.mockGivenName;
+            config.editorMock.mockFamilyName = legacyMock.mockFamilyName;
+            config.editorMock.mockPictureUrl = legacyMock.mockPictureUrl;
+            config.editorMock.mockLocale = legacyMock.mockLocale;
+            config.editorMock.authDelaySeconds = legacyMock.authDelaySeconds;
+            config.editorMock.mockUnlockedCount = legacyMock.mockUnlockedCount;
+            config.editorMock.mockScore = legacyMock.mockScore;
+            config.editorMock.mockChurnProbability = legacyMock.mockChurnProbability;
             return config;
+        }
+        #pragma warning restore CS0618
+
+        private static bool IsPersistedAsset(ScriptableObject obj)
+        {
+            #if UNITY_EDITOR
+                return UnityEditor.AssetDatabase.Contains(obj);
+            #else
+                return false;
+            #endif
         }
 
         private void OnDestroy()

@@ -19,7 +19,7 @@ namespace BizSim.GPlay.Games
         public event Action<GamesLeaderboardError> OnLeaderboardError;
 #pragma warning restore CS0067
 
-        public MockLeaderboardProvider(GamesServicesMockConfig config)
+        public MockLeaderboardProvider(GamesServicesConfig.MockSettings mock)
         {
             InitializeMockData();
             BizSimGamesLogger.Info("MockLeaderboardProvider initialized");

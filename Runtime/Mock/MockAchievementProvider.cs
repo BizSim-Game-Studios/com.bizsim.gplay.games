@@ -15,7 +15,6 @@ namespace BizSim.GPlay.Games
     /// </summary>
     internal class MockAchievementProvider : IGamesAchievementProvider
     {
-        private readonly GamesServicesMockConfig _config;
         private Dictionary<string, GamesAchievement> _achievements;
         private HashSet<string> _unlockedAchievements;
 
@@ -24,9 +23,8 @@ namespace BizSim.GPlay.Games
         public event Action<string> OnAchievementRevealed;
         public event Action<GamesAchievementError> OnAchievementError;
 
-        public MockAchievementProvider(GamesServicesMockConfig config)
+        public MockAchievementProvider(GamesServicesConfig.MockSettings mock)
         {
-            _config = config ?? throw new ArgumentNullException(nameof(config));
             InitializeMockData();
             BizSimGamesLogger.Info("MockAchievementProvider initialized");
         }

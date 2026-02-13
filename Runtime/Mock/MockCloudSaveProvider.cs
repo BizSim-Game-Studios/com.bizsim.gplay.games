@@ -19,7 +19,7 @@ namespace BizSim.GPlay.Games
         public event Action<GamesCloudSaveError> OnCloudSaveError;
 #pragma warning restore CS0067
 
-        public MockCloudSaveProvider(GamesServicesMockConfig config)
+        public MockCloudSaveProvider(GamesServicesConfig.MockSettings mock)
         {
             BizSimGamesLogger.Info("MockCloudSaveProvider initialized");
         }
