@@ -43,5 +43,11 @@ namespace BizSim.GPlay.Games
         /// Snapshot description.
         /// </summary>
         public string description;
+
+        /// <summary>
+        /// Cover image URI from Google servers (read-back only).
+        /// Use DownloadCoverImageAsync to retrieve the Texture2D.
+        /// </summary>
+        public string coverImageUri;
     }
 }

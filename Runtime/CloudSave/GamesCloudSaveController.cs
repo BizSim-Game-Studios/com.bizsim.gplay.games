@@ -76,10 +76,6 @@ namespace BizSim.GPlay.Games
             }
         }
 
-        /// <remarks>
-        /// coverImage is accepted for API compatibility but currently ignored by the Java bridge.
-        /// PGS v2 supports cover images via SnapshotMetadataChange.Builder.setCoverImage().
-        /// </remarks>
         public async Task CommitSnapshotAsync(SnapshotHandle handle, byte[] data, string description = null,
             long playedTimeMillis = 0, byte[] coverImage = null, CancellationToken ct = default)
         {
@@ -88,7 +84,8 @@ namespace BizSim.GPlay.Games
 
             using (ct.Register(() => _commitTcs.TrySetCanceled()))
             {
-                _cloudSaveBridge.Call("commitSnapshot", handle.nativeHandle, data, description ?? "", playedTimeMillis);
+                _cloudSaveBridge.Call("commitSnapshot", handle.nativeHandle, data,
+                    description ?? "", playedTimeMillis, coverImage);
                 await _commitTcs.Task;
             }
         }
@@ -124,33 +121,44 @@ namespace BizSim.GPlay.Games
 
             if (handle.hasConflict)
             {
-                _conflictTcs = new TaskCompletionSource<ConflictResolution>();
-                var cts = new CancellationTokenSource(TimeSpan.FromSeconds(CONFLICT_TIMEOUT_SECONDS));
-
-                try
-                {
-                    // Manual timeout implementation (.NET Standard 2.1 compatible)
-                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(CONFLICT_TIMEOUT_SECONDS), cts.Token);
-                    var completedTask = await Task.WhenAny(_conflictTcs.Task, timeoutTask);
-
-                    if (completedTask == timeoutTask)
-                    {
-                        BizSimGamesLogger.Warning("Conflict resolution timeout - using local data");
-                        // Timeout fallback: use local (safer)
-                    }
-                    else
-                    {
-                        var resolution = await _conflictTcs.Task;
-                        // Resolution applied by conflict handler
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    BizSimGamesLogger.Warning("Conflict resolution cancelled");
-                }
+                handle = await HandleConflictWithTimeout(ct);
             }
 
             await CommitSnapshotAsync(handle, data, description, 0, null, ct);
+        }
+
+        private async Task<SnapshotHandle> HandleConflictWithTimeout(CancellationToken ct)
+        {
+            _conflictTcs = new TaskCompletionSource<ConflictResolution>();
+
+            ConflictResolution resolution;
+            try
+            {
+                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(CONFLICT_TIMEOUT_SECONDS), ct);
+                var completedTask = await Task.WhenAny(_conflictTcs.Task, timeoutTask);
+
+                if (completedTask == timeoutTask)
+                {
+                    BizSimGamesLogger.Warning("Conflict resolution timeout - using server version");
+                    resolution = ConflictResolution.UseServer;
+                }
+                else
+                {
+                    resolution = await _conflictTcs.Task;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                BizSimGamesLogger.Warning("Conflict resolution cancelled - using server version");
+                resolution = ConflictResolution.UseServer;
+            }
+
+            _openTcs = new TaskCompletionSource<SnapshotHandle>();
+
+            _cloudSaveBridge.Call("resolveConflict", resolution.ToString(), "");
+
+            var resolvedHandle = await _openTcs.Task;
+            return resolvedHandle;
         }
 
         public async Task<byte[]> LoadAsync(string filename, CancellationToken ct = default)
@@ -162,7 +170,7 @@ namespace BizSim.GPlay.Games
             }
             catch
             {
-                return null; // Snapshot not found
+                return null;
             }
         }
 
@@ -217,7 +225,6 @@ namespace BizSim.GPlay.Games
                     ResolveAsync = async (resolution) =>
                     {
                         _conflictTcs?.TrySetResult(resolution);
-                        _cloudSaveBridge.Call("resolveConflict", resolution.ToString(), "");
                         await Task.CompletedTask;
                     }
                 };

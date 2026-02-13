@@ -349,127 +349,29 @@ namespace BizSim.GPlay.Games
             return age.TotalHours < CACHE_LIFETIME_HOURS;
         }
 
+        [Serializable]
+        private class AchievementArrayWrapper
+        {
+            public GamesAchievement[] items;
+        }
+
         private List<GamesAchievement> ParseAchievementsJson(string json)
         {
-            var achievements = new List<GamesAchievement>();
-
             try
             {
-                // Parse JSON array manually (avoid JsonUtility for arrays)
-                var jsonArray = SimpleJson.DeserializeArray(json);
-
-                foreach (var item in jsonArray)
-                {
-                    var obj = item as Dictionary<string, object>;
-                    if (obj == null) continue;
-
-                    var achievement = new GamesAchievement
-                    {
-                        achievementId = obj.GetValueOrDefault("achievementId", ""),
-                        name = obj.GetValueOrDefault("name", ""),
-                        description = obj.GetValueOrDefault("description", ""),
-                        state = (AchievementState)Convert.ToInt32(obj.GetValueOrDefault("state", 0)),
-                        type = (AchievementType)Convert.ToInt32(obj.GetValueOrDefault("type", 0)),
-                        currentSteps = Convert.ToInt32(obj.GetValueOrDefault("currentSteps", 0)),
-                        totalSteps = Convert.ToInt32(obj.GetValueOrDefault("totalSteps", 0)),
-                        xpValue = Convert.ToInt32(obj.GetValueOrDefault("xpValue", 0)),
-                        unlockedTimestamp = Convert.ToInt64(obj.GetValueOrDefault("unlockedTimestamp", 0L)),
-                        revealedIconUrl = obj.GetValueOrDefault("revealedIconUrl", ""),
-                        unlockedIconUrl = obj.GetValueOrDefault("unlockedIconUrl", "")
-                    };
-
-                    achievements.Add(achievement);
-                }
+                var wrappedJson = "{\"items\":" + json + "}";
+                var wrapper = JsonUtility.FromJson<AchievementArrayWrapper>(wrappedJson);
+                return wrapper?.items != null
+                    ? new List<GamesAchievement>(wrapper.items)
+                    : new List<GamesAchievement>();
             }
             catch (Exception ex)
             {
                 BizSimGamesLogger.Error($"JSON parse error: {ex.Message}");
                 throw;
             }
-
-            return achievements;
         }
 
         #endregion
-
-        #region Simple JSON Parser (lightweight, no dependencies)
-
-        private static class SimpleJson
-        {
-            public static List<object> DeserializeArray(string json)
-            {
-                // Very basic JSON array parser - production should use proper JSON library
-                var items = new List<object>();
-                json = json.Trim().Trim('[', ']');
-
-                int depth = 0;
-                int start = 0;
-
-                for (int i = 0; i < json.Length; i++)
-                {
-                    if (json[i] == '{') depth++;
-                    else if (json[i] == '}') depth--;
-
-                    if (depth == 0 && (json[i] == ',' || i == json.Length - 1))
-                    {
-                        int end = (i == json.Length - 1) ? i + 1 : i;
-                        string objStr = json.Substring(start, end - start).Trim().Trim(',').Trim();
-
-                        if (!string.IsNullOrEmpty(objStr))
-                        {
-                            items.Add(DeserializeObject(objStr));
-                        }
-
-                        start = i + 1;
-                    }
-                }
-
-                return items;
-            }
-
-            private static Dictionary<string, object> DeserializeObject(string json)
-            {
-                var dict = new Dictionary<string, object>();
-                json = json.Trim().Trim('{', '}');
-
-                var pairs = json.Split(new[] { ",\"" }, StringSplitOptions.RemoveEmptyEntries);
-
-                foreach (var pair in pairs)
-                {
-                    var colonIndex = pair.IndexOf(':');
-                    if (colonIndex < 0) continue;
-
-                    string key = pair.Substring(0, colonIndex).Trim().Trim('"');
-                    string value = pair.Substring(colonIndex + 1).Trim().Trim('"');
-
-                    dict[key] = value;
-                }
-
-                return dict;
-            }
-        }
-
-        #endregion
-    }
-
-    /// <summary>
-    /// Extension methods for Dictionary (must be top-level static class).
-    /// </summary>
-    internal static class DictionaryExtensions
-    {
-        public static T GetValueOrDefault<T>(this Dictionary<string, object> dict, string key, T defaultValue)
-        {
-            if (!dict.TryGetValue(key, out var value))
-                return defaultValue;
-
-            try
-            {
-                return (T)Convert.ChangeType(value, typeof(T));
-            }
-            catch
-            {
-                return defaultValue;
-            }
-        }
     }
 }

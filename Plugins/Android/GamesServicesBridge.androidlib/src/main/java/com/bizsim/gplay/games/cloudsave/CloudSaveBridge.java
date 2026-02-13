@@ -3,6 +3,8 @@
 package com.bizsim.gplay.games.cloudsave;
 
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.util.Log;
 
 import com.google.android.gms.games.PlayGames;
@@ -97,7 +99,7 @@ public class CloudSaveBridge {
                 });
     }
 
-    public void commitSnapshot(String nativeHandle, byte[] data, String description, long playedTimeMillis) {
+    public void commitSnapshot(String nativeHandle, byte[] data, String description, long playedTimeMillis, byte[] coverImage) {
         Log.d(TAG, "Commit snapshot: " + nativeHandle + " (" + data.length + " bytes)");
 
         String[] parts = nativeHandle.split(":");
@@ -121,6 +123,19 @@ public class CloudSaveBridge {
 
                             if (description != null && !description.isEmpty()) {
                                 metaBuilder.setDescription(description);
+                            }
+
+                            if (coverImage != null && coverImage.length > 0) {
+                                try {
+                                    Bitmap bitmap = BitmapFactory.decodeByteArray(coverImage, 0, coverImage.length);
+                                    if (bitmap != null) {
+                                        metaBuilder.setCoverImage(bitmap);
+                                    }
+                                } catch (OutOfMemoryError e) {
+                                    Log.e(TAG,
+                                        "Cover image decode OOM (" + coverImage.length + " bytes). " +
+                                        "Use max 640x360 resolution. Save continues without cover image.", e);
+                                }
                             }
 
                             snapshotsClient.commitAndClose(snapshot, metaBuilder.build())
@@ -277,6 +292,11 @@ public class CloudSaveBridge {
         obj.put("lastModifiedTimestamp", metadata.getLastModifiedTimestamp());
         obj.put("playedTimeMillis", metadata.getPlayedTime());
         obj.put("description", metadata.getDescription());
+
+        android.net.Uri coverUri = metadata.getCoverImageUri();
+        if (coverUri != null) {
+            obj.put("coverImageUri", coverUri.toString());
+        }
 
         return obj.toString();
     }

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-02-13
+
+### Fixed
+- **SimpleJson parser replaced with JsonUtility** — custom JSON parser split on `","` which broke when achievement descriptions contained commas; now uses `JsonUtility.FromJson` with wrapper array pattern for reliable parsing
+- **Cloud save conflict race condition** — extracted `HandleConflictWithTimeout` method with guaranteed safe ordering: wait for resolution → renew `_openTcs` → call Java → await new handle; prevents stale handle usage and TCS race condition after conflict resolution
+- **Cover image forwarding to Java bridge** — `CommitSnapshotAsync` now passes `coverImage` byte array to Java `commitSnapshot`; Java decodes via `BitmapFactory.decodeByteArray` with `OutOfMemoryError` catch, sets `setCoverImage` on `SnapshotMetadataChange.Builder`
+- **Cover image URI read-back** — `serializeSnapshot` in Java now includes `coverImageUri` from `SnapshotMetadata.getCoverImageUri()`; `SnapshotHandle.coverImageUri` field added for C# access
+
+### Removed
+- `SimpleJson` internal JSON parser class (replaced by `JsonUtility`)
+- `DictionaryExtensions` helper class (no longer needed)
+
+---
+
 ## [1.2.0] - 2026-02-13
 
 ### Added
