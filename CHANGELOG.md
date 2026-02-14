@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.14.0] - 2026-02-14
+
+### Fixed
+- **Achievement concurrent operation race condition** — replaced shared `TaskCompletionSource` fields with per-achievementId dictionaries for `IncrementAchievementAsync`, `UnlockAchievementAsync`, and `RevealAchievementAsync`; concurrent calls for different achievement IDs no longer cancel each other via `TcsGuard.Replace`, eliminating spurious "A task was canceled" errors
+
+---
+
 ## [1.13.0] - 2026-02-13
 
 ### Fixed

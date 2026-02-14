@@ -17,9 +17,9 @@ namespace BizSim.GPlay.Games
 
         private AchievementCallbackProxy _callbackProxy;
 
-        private TaskCompletionSource<bool> _unlockTcs;
-        private TaskCompletionSource<bool> _incrementTcs;
-        private TaskCompletionSource<bool> _revealTcs;
+        private readonly Dictionary<string, TaskCompletionSource<bool>> _pendingUnlocks = new();
+        private readonly Dictionary<string, TaskCompletionSource<bool>> _pendingIncrements = new();
+        private readonly Dictionary<string, TaskCompletionSource<bool>> _pendingReveals = new();
         private TaskCompletionSource<bool> _showUITcs;
         private TaskCompletionSource<List<GamesAchievement>> _loadTcs;
         private TaskCompletionSource<bool> _unlockMultipleTcs;
@@ -62,7 +62,13 @@ namespace BizSim.GPlay.Games
                 return;
             }
 
-            var tcs = TcsGuard.Replace(ref _unlockTcs);
+            var tcs = new TaskCompletionSource<bool>();
+            lock (_pendingUnlocks)
+            {
+                if (_pendingUnlocks.TryGetValue(achievementId, out var existing))
+                    existing.TrySetCanceled();
+                _pendingUnlocks[achievementId] = tcs;
+            }
 
             using (ct.Register(() => tcs.TrySetCanceled()))
             {
@@ -82,7 +88,13 @@ namespace BizSim.GPlay.Games
             if (steps <= 0)
                 throw new ArgumentException("Steps must be greater than 0", nameof(steps));
 
-            var tcs = TcsGuard.Replace(ref _incrementTcs);
+            var tcs = new TaskCompletionSource<bool>();
+            lock (_pendingIncrements)
+            {
+                if (_pendingIncrements.TryGetValue(achievementId, out var existing))
+                    existing.TrySetCanceled();
+                _pendingIncrements[achievementId] = tcs;
+            }
 
             using (ct.Register(() => tcs.TrySetCanceled()))
             {
@@ -99,7 +111,13 @@ namespace BizSim.GPlay.Games
             if (string.IsNullOrEmpty(achievementId))
                 throw new ArgumentException("Achievement ID cannot be null or empty", nameof(achievementId));
 
-            var tcs = TcsGuard.Replace(ref _revealTcs);
+            var tcs = new TaskCompletionSource<bool>();
+            lock (_pendingReveals)
+            {
+                if (_pendingReveals.TryGetValue(achievementId, out var existing))
+                    existing.TrySetCanceled();
+                _pendingReveals[achievementId] = tcs;
+            }
 
             using (ct.Register(() => tcs.TrySetCanceled()))
             {
@@ -178,7 +196,7 @@ namespace BizSim.GPlay.Games
 
             OnAchievementUnlocked?.Invoke(achievementId);
 
-            _unlockTcs?.TrySetResult(true);
+            ResolvePending(_pendingUnlocks, achievementId);
             _unlockMultipleTcs?.TrySetResult(true);
         }
 
@@ -194,7 +212,7 @@ namespace BizSim.GPlay.Games
             }
 
             OnAchievementIncremented?.Invoke(achievementId, currentSteps);
-            _incrementTcs?.TrySetResult(true);
+            ResolvePending(_pendingIncrements, achievementId);
         }
 
         internal void OnAchievementRevealedFromJava(string achievementId)
@@ -203,7 +221,7 @@ namespace BizSim.GPlay.Games
                 _achievementCache[achievementId].state = AchievementState.Revealed;
 
             OnAchievementRevealed?.Invoke(achievementId);
-            _revealTcs?.TrySetResult(true);
+            ResolvePending(_pendingReveals, achievementId);
         }
 
         internal void OnAchievementsLoadedFromJava(string achievementsJson)
@@ -238,12 +256,75 @@ namespace BizSim.GPlay.Games
             OnAchievementError?.Invoke(error);
 
             var exception = new GamesAchievementException(error);
-            _unlockTcs?.TrySetException(exception);
-            _incrementTcs?.TrySetException(exception);
-            _revealTcs?.TrySetException(exception);
+
+            if (!string.IsNullOrEmpty(achievementId))
+            {
+                FailPending(_pendingUnlocks, achievementId, exception);
+                FailPending(_pendingIncrements, achievementId, exception);
+                FailPending(_pendingReveals, achievementId, exception);
+            }
+            else
+            {
+                FailAllPending(_pendingUnlocks, exception);
+                FailAllPending(_pendingIncrements, exception);
+                FailAllPending(_pendingReveals, exception);
+            }
+
             _showUITcs?.TrySetException(exception);
             _loadTcs?.TrySetException(exception);
             _unlockMultipleTcs?.TrySetException(exception);
+        }
+
+        #endregion
+
+        #region Pending Operation Helpers
+
+        private static void ResolvePending(Dictionary<string, TaskCompletionSource<bool>> dict, string id)
+        {
+            TaskCompletionSource<bool> tcs;
+            lock (dict)
+            {
+                if (!dict.TryGetValue(id, out tcs))
+                    return;
+                dict.Remove(id);
+            }
+            tcs.TrySetResult(true);
+        }
+
+        private static void FailPending(Dictionary<string, TaskCompletionSource<bool>> dict, string id, Exception ex)
+        {
+            TaskCompletionSource<bool> tcs;
+            lock (dict)
+            {
+                if (!dict.TryGetValue(id, out tcs))
+                    return;
+                dict.Remove(id);
+            }
+            tcs.TrySetException(ex);
+        }
+
+        private static void FailAllPending(Dictionary<string, TaskCompletionSource<bool>> dict, Exception ex)
+        {
+            List<TaskCompletionSource<bool>> pending;
+            lock (dict)
+            {
+                pending = new List<TaskCompletionSource<bool>>(dict.Values);
+                dict.Clear();
+            }
+            foreach (var tcs in pending)
+                tcs.TrySetException(ex);
+        }
+
+        private static void CancelAllPending(Dictionary<string, TaskCompletionSource<bool>> dict)
+        {
+            List<TaskCompletionSource<bool>> pending;
+            lock (dict)
+            {
+                pending = new List<TaskCompletionSource<bool>>(dict.Values);
+                dict.Clear();
+            }
+            foreach (var tcs in pending)
+                tcs.TrySetCanceled();
         }
 
         #endregion
@@ -295,9 +376,9 @@ namespace BizSim.GPlay.Games
 
         protected override void OnDispose()
         {
-            _unlockTcs?.TrySetCanceled();
-            _incrementTcs?.TrySetCanceled();
-            _revealTcs?.TrySetCanceled();
+            CancelAllPending(_pendingUnlocks);
+            CancelAllPending(_pendingIncrements);
+            CancelAllPending(_pendingReveals);
             _showUITcs?.TrySetCanceled();
             _loadTcs?.TrySetCanceled();
             _unlockMultipleTcs?.TrySetCanceled();
