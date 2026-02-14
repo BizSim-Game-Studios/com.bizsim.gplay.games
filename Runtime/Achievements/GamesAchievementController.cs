@@ -6,21 +6,17 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace BizSim.GPlay.Games
 {
-    /// <summary>
-    /// Android implementation of achievements provider using Google Play Games SDK.
-    /// </summary>
-    internal class GamesAchievementController : IGamesAchievementProvider
+    internal class GamesAchievementController : JniBridgeBase, IGamesAchievementProvider
     {
         private const string CACHE_PREFIX = "BizSimGames_Achievement_";
         private const int CACHE_LIFETIME_HOURS = 24;
 
-        private AndroidJavaObject _achievementBridge;
         private AchievementCallbackProxy _callbackProxy;
 
-        // TaskCompletionSource for async operations
         private TaskCompletionSource<bool> _unlockTcs;
         private TaskCompletionSource<bool> _incrementTcs;
         private TaskCompletionSource<bool> _revealTcs;
@@ -28,52 +24,27 @@ namespace BizSim.GPlay.Games
         private TaskCompletionSource<List<GamesAchievement>> _loadTcs;
         private TaskCompletionSource<bool> _unlockMultipleTcs;
 
-        // Local cache
         private Dictionary<string, GamesAchievement> _achievementCache;
         private DateTime _cacheTimestamp;
 
-        // Events
         public event Action<string> OnAchievementUnlocked;
         public event Action<string, int> OnAchievementIncremented;
         public event Action<string> OnAchievementRevealed;
         public event Action<GamesAchievementError> OnAchievementError;
 
-        public GamesAchievementController()
+        protected override string JavaClassName => JniConstants.AchievementBridge;
+
+        protected override AndroidJavaProxy CreateCallbackProxy()
         {
-            InitializeBridge();
+            _callbackProxy = new AchievementCallbackProxy(this);
+            return _callbackProxy;
         }
 
-        private void InitializeBridge()
+        public GamesAchievementController()
         {
-            try
-            {
-                BizSimGamesLogger.Info("Initializing AchievementBridge...");
-
-                // Get Unity activity
-                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
-                {
-                    // Create bridge
-                    _achievementBridge = new AndroidJavaObject(
-                        "com.bizsim.gplay.games.achievements.AchievementBridge",
-                        activity);
-
-                    // Create and register callback proxy
-                    _callbackProxy = new AchievementCallbackProxy(this);
-                    _achievementBridge.Call("setCallback", _callbackProxy);
-
-                    BizSimGamesLogger.Info("AchievementBridge initialized successfully");
-                }
-
-                // Initialize cache
-                _achievementCache = new Dictionary<string, GamesAchievement>();
-                _cacheTimestamp = DateTime.MinValue;
-            }
-            catch (Exception ex)
-            {
-                BizSimGamesLogger.Error($"Failed to initialize AchievementBridge: {ex.Message}");
-                throw;
-            }
+            _achievementCache = new Dictionary<string, GamesAchievement>();
+            _cacheTimestamp = DateTime.MinValue;
+            InitializeBridge();
         }
 
         #region Public API
@@ -83,25 +54,21 @@ namespace BizSim.GPlay.Games
             ct.ThrowIfCancellationRequested();
 
             if (string.IsNullOrEmpty(achievementId))
-            {
                 throw new ArgumentException("Achievement ID cannot be null or empty", nameof(achievementId));
-            }
 
-            // Check cache - avoid redundant unlock calls
             if (IsAchievementUnlockedInCache(achievementId))
             {
                 BizSimGamesLogger.Info($"Achievement {achievementId} already unlocked (cached)");
                 return;
             }
 
-            _unlockTcs = new TaskCompletionSource<bool>();
+            var tcs = TcsGuard.Replace(ref _unlockTcs);
 
-            using (ct.Register(() => _unlockTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 BizSimGamesLogger.Info($"Unlocking achievement: {achievementId}");
-                _achievementBridge.Call("unlockAchievement", achievementId);
-
-                await _unlockTcs.Task;
+                CallBridge("unlockAchievement", achievementId);
+                await tcs.Task;
             }
         }
 
@@ -110,23 +77,18 @@ namespace BizSim.GPlay.Games
             ct.ThrowIfCancellationRequested();
 
             if (string.IsNullOrEmpty(achievementId))
-            {
                 throw new ArgumentException("Achievement ID cannot be null or empty", nameof(achievementId));
-            }
 
             if (steps <= 0)
-            {
                 throw new ArgumentException("Steps must be greater than 0", nameof(steps));
-            }
 
-            _incrementTcs = new TaskCompletionSource<bool>();
+            var tcs = TcsGuard.Replace(ref _incrementTcs);
 
-            using (ct.Register(() => _incrementTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 BizSimGamesLogger.Info($"Incrementing achievement: {achievementId} by {steps}");
-                _achievementBridge.Call("incrementAchievement", achievementId, steps);
-
-                await _incrementTcs.Task;
+                CallBridge("incrementAchievement", achievementId, steps);
+                await tcs.Task;
             }
         }
 
@@ -135,18 +97,15 @@ namespace BizSim.GPlay.Games
             ct.ThrowIfCancellationRequested();
 
             if (string.IsNullOrEmpty(achievementId))
-            {
                 throw new ArgumentException("Achievement ID cannot be null or empty", nameof(achievementId));
-            }
 
-            _revealTcs = new TaskCompletionSource<bool>();
+            var tcs = TcsGuard.Replace(ref _revealTcs);
 
-            using (ct.Register(() => _revealTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 BizSimGamesLogger.Info($"Revealing achievement: {achievementId}");
-                _achievementBridge.Call("revealAchievement", achievementId);
-
-                await _revealTcs.Task;
+                CallBridge("revealAchievement", achievementId);
+                await tcs.Task;
             }
         }
 
@@ -154,14 +113,13 @@ namespace BizSim.GPlay.Games
         {
             ct.ThrowIfCancellationRequested();
 
-            _showUITcs = new TaskCompletionSource<bool>();
+            var tcs = TcsGuard.Replace(ref _showUITcs);
 
-            using (ct.Register(() => _showUITcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 BizSimGamesLogger.Info("Showing achievements UI");
-                _achievementBridge.Call("showAchievementsUI");
-
-                await _showUITcs.Task;
+                CallBridge("showAchievementsUI");
+                await tcs.Task;
             }
         }
 
@@ -169,21 +127,19 @@ namespace BizSim.GPlay.Games
         {
             ct.ThrowIfCancellationRequested();
 
-            // Check cache
             if (!forceReload && IsCacheValid())
             {
                 BizSimGamesLogger.Info("Returning cached achievements");
                 return _achievementCache.Values.ToList();
             }
 
-            _loadTcs = new TaskCompletionSource<List<GamesAchievement>>();
+            var tcs = TcsGuard.Replace(ref _loadTcs);
 
-            using (ct.Register(() => _loadTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 BizSimGamesLogger.Info($"Loading achievements (forceReload: {forceReload})");
-                _achievementBridge.Call("loadAchievements", forceReload);
-
-                return await _loadTcs.Task;
+                CallBridge("loadAchievements", forceReload);
+                return await tcs.Task;
             }
         }
 
@@ -192,21 +148,16 @@ namespace BizSim.GPlay.Games
             ct.ThrowIfCancellationRequested();
 
             if (achievementIds == null || achievementIds.Count == 0)
-            {
                 throw new ArgumentException("Achievement IDs list cannot be null or empty", nameof(achievementIds));
-            }
 
-            _unlockMultipleTcs = new TaskCompletionSource<bool>();
+            var tcs = TcsGuard.Replace(ref _unlockMultipleTcs);
 
-            using (ct.Register(() => _unlockMultipleTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 BizSimGamesLogger.Info($"Unlocking {achievementIds.Count} achievements in batch");
-
-                // Serialize to JSON array
                 string json = "[\"" + string.Join("\",\"", achievementIds) + "\"]";
-                _achievementBridge.Call("unlockMultiple", json);
-
-                await _unlockMultipleTcs.Task;
+                CallBridge("unlockMultiple", json);
+                await tcs.Task;
             }
         }
 
@@ -216,58 +167,42 @@ namespace BizSim.GPlay.Games
 
         internal void OnAchievementUnlockedFromJava(string achievementId)
         {
-            // Update cache
             if (_achievementCache.ContainsKey(achievementId))
             {
                 _achievementCache[achievementId].state = AchievementState.Unlocked;
                 _achievementCache[achievementId].unlockedTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             }
 
-            // Save to PlayerPrefs cache
             PlayerPrefs.SetString(CACHE_PREFIX + achievementId, "unlocked");
             PlayerPrefs.Save();
 
-            // Fire event
             OnAchievementUnlocked?.Invoke(achievementId);
 
-            // Complete task
             _unlockTcs?.TrySetResult(true);
-            _unlockMultipleTcs?.TrySetResult(true);  // Batch unlock
+            _unlockMultipleTcs?.TrySetResult(true);
         }
 
         internal void OnAchievementIncrementedFromJava(string achievementId, int currentSteps, int totalSteps)
         {
-            // Update cache
             if (_achievementCache.ContainsKey(achievementId))
             {
                 _achievementCache[achievementId].currentSteps = currentSteps;
                 _achievementCache[achievementId].totalSteps = totalSteps;
 
                 if (currentSteps >= totalSteps)
-                {
                     _achievementCache[achievementId].state = AchievementState.Unlocked;
-                }
             }
 
-            // Fire event
             OnAchievementIncremented?.Invoke(achievementId, currentSteps);
-
-            // Complete task
             _incrementTcs?.TrySetResult(true);
         }
 
         internal void OnAchievementRevealedFromJava(string achievementId)
         {
-            // Update cache
             if (_achievementCache.ContainsKey(achievementId))
-            {
                 _achievementCache[achievementId].state = AchievementState.Revealed;
-            }
 
-            // Fire event
             OnAchievementRevealed?.Invoke(achievementId);
-
-            // Complete task
             _revealTcs?.TrySetResult(true);
         }
 
@@ -277,17 +212,12 @@ namespace BizSim.GPlay.Games
             {
                 var achievements = ParseAchievementsJson(achievementsJson);
 
-                // Update cache
                 _achievementCache.Clear();
                 foreach (var achievement in achievements)
-                {
                     _achievementCache[achievement.achievementId] = achievement;
-                }
                 _cacheTimestamp = DateTime.UtcNow;
 
                 BizSimGamesLogger.Info($"Loaded {achievements.Count} achievements");
-
-                // Complete task
                 _loadTcs?.TrySetResult(achievements);
             }
             catch (Exception ex)
@@ -305,12 +235,9 @@ namespace BizSim.GPlay.Games
         internal void OnAchievementErrorFromJava(int errorCode, string errorMessage, string achievementId)
         {
             var error = new GamesAchievementError(errorCode, errorMessage, achievementId);
-
-            // Fire event
             OnAchievementError?.Invoke(error);
 
-            // Complete tasks with exception
-            var exception = new Exception($"Achievement error {errorCode}: {errorMessage}");
+            var exception = new GamesAchievementException(error);
             _unlockTcs?.TrySetException(exception);
             _incrementTcs?.TrySetException(exception);
             _revealTcs?.TrySetException(exception);
@@ -325,17 +252,11 @@ namespace BizSim.GPlay.Games
 
         private bool IsAchievementUnlockedInCache(string achievementId)
         {
-            // Check PlayerPrefs cache
-            if (PlayerPrefs.HasKey(CACHE_PREFIX + achievementId))
-            {
-                return PlayerPrefs.GetString(CACHE_PREFIX + achievementId) == "unlocked";
-            }
-
-            // Check memory cache
             if (_achievementCache.ContainsKey(achievementId))
-            {
                 return _achievementCache[achievementId].state == AchievementState.Unlocked;
-            }
+
+            if (PlayerPrefs.HasKey(CACHE_PREFIX + achievementId))
+                return PlayerPrefs.GetString(CACHE_PREFIX + achievementId) == "unlocked";
 
             return false;
         }
@@ -349,21 +270,19 @@ namespace BizSim.GPlay.Games
             return age.TotalHours < CACHE_LIFETIME_HOURS;
         }
 
-        [Serializable]
-        private class AchievementArrayWrapper
+        [Serializable, Preserve]
+        private class AchievementArrayWrapper : IArrayWrapper<GamesAchievement>
         {
             public GamesAchievement[] items;
+            public GamesAchievement[] Items => items;
         }
 
         private List<GamesAchievement> ParseAchievementsJson(string json)
         {
             try
             {
-                var wrappedJson = "{\"items\":" + json + "}";
-                var wrapper = JsonUtility.FromJson<AchievementArrayWrapper>(wrappedJson);
-                return wrapper?.items != null
-                    ? new List<GamesAchievement>(wrapper.items)
-                    : new List<GamesAchievement>();
+                var items = JsonArrayParser.Parse<AchievementArrayWrapper, GamesAchievement>(json);
+                return new List<GamesAchievement>(items);
             }
             catch (Exception ex)
             {
@@ -373,5 +292,18 @@ namespace BizSim.GPlay.Games
         }
 
         #endregion
+
+        protected override void OnDispose()
+        {
+            _unlockTcs?.TrySetCanceled();
+            _incrementTcs?.TrySetCanceled();
+            _revealTcs?.TrySetCanceled();
+            _showUITcs?.TrySetCanceled();
+            _loadTcs?.TrySetCanceled();
+            _unlockMultipleTcs?.TrySetCanceled();
+
+            _achievementCache?.Clear();
+            _callbackProxy = null;
+        }
     }
 }

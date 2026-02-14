@@ -3,6 +3,7 @@
 package com.bizsim.gplay.games.cloudsave;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Log;
@@ -26,6 +27,9 @@ import org.json.JSONObject;
 public class CloudSaveBridge {
     private static final String TAG = "BizSimGames.CloudSave";
     private static final int CONFLICT_RESOLUTION_POLICY_MANUAL = -1;
+    private static final int RC_SAVED_GAMES = 9004;
+
+    private static ICloudSaveCallback pendingUICallback;
 
     private final Activity activity;
     private final SnapshotsClient snapshotsClient;
@@ -127,7 +131,7 @@ public class CloudSaveBridge {
 
                             if (coverImage != null && coverImage.length > 0) {
                                 try {
-                                    Bitmap bitmap = BitmapFactory.decodeByteArray(coverImage, 0, coverImage.length);
+                                    Bitmap bitmap = decodeCoverImageSafe(coverImage);
                                     if (bitmap != null) {
                                         metaBuilder.setCoverImage(bitmap);
                                     }
@@ -192,18 +196,45 @@ public class CloudSaveBridge {
     public void showSavedGamesUI(String title, boolean allowAddButton, boolean allowDelete, int maxSnapshots) {
         Log.d(TAG, "Show saved games UI");
 
+        pendingUICallback = callback;
+
         snapshotsClient.getSelectSnapshotIntent(title, allowAddButton, allowDelete, maxSnapshots)
                 .addOnSuccessListener(activity, intent -> {
-                    activity.startActivityForResult(intent, 9004);
-                    // NOTE: Fires on UI launch with null, not after user selection.
-                    // Proper selection detection requires onActivityResult handling.
-                    if (callback != null) {
-                        callback.onSavedGamesUIResult(null);
-                    }
+                    activity.startActivityForResult(intent, RC_SAVED_GAMES);
                 })
                 .addOnFailureListener(activity, e -> {
+                    pendingUICallback = null;
                     sendError(100, "UI failed: " + e.getMessage(), null);
                 });
+    }
+
+    public static void handleActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode != RC_SAVED_GAMES || pendingUICallback == null) return;
+
+        try {
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                if (data.hasExtra(SnapshotsClient.EXTRA_SNAPSHOT_METADATA)) {
+                    SnapshotMetadata metadata = data.getParcelableExtra(
+                        SnapshotsClient.EXTRA_SNAPSHOT_METADATA);
+                    if (metadata != null) {
+                        pendingUICallback.onSavedGamesUIResult(metadata.getUniqueName());
+                    } else {
+                        pendingUICallback.onSavedGamesUIResult(null);
+                    }
+                } else if (data.hasExtra(SnapshotsClient.EXTRA_SNAPSHOT_NEW)) {
+                    pendingUICallback.onSavedGamesUIResult("__NEW__");
+                } else {
+                    pendingUICallback.onSavedGamesUIResult(null);
+                }
+            } else {
+                pendingUICallback.onSavedGamesUIResult(null);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "handleActivityResult error", e);
+            pendingUICallback.onSavedGamesUIResult(null);
+        } finally {
+            pendingUICallback = null;
+        }
     }
 
     // Stores last conflict for resolution
@@ -281,6 +312,40 @@ public class CloudSaveBridge {
                     lastConflict = null;
                     sendError(100, "Resolve failed: " + e.getMessage(), null);
                 });
+    }
+
+    private static final int MAX_COVER_WIDTH = 640;
+    private static final int MAX_COVER_HEIGHT = 360;
+
+    private Bitmap decodeCoverImageSafe(byte[] coverImage) {
+        BitmapFactory.Options boundsOptions = new BitmapFactory.Options();
+        boundsOptions.inJustDecodeBounds = true;
+        BitmapFactory.decodeByteArray(coverImage, 0, coverImage.length, boundsOptions);
+
+        int width = boundsOptions.outWidth;
+        int height = boundsOptions.outHeight;
+
+        if (width <= 0 || height <= 0) {
+            Log.e(TAG, "Cover image has invalid dimensions (" + width + "x" + height + ")");
+            return null;
+        }
+
+        int inSampleSize = 1;
+        if (width > MAX_COVER_WIDTH || height > MAX_COVER_HEIGHT) {
+            int halfWidth = width / 2;
+            int halfHeight = height / 2;
+            while ((halfWidth / inSampleSize) >= MAX_COVER_WIDTH
+                    && (halfHeight / inSampleSize) >= MAX_COVER_HEIGHT) {
+                inSampleSize *= 2;
+            }
+            Log.w(TAG, "Cover image " + width + "x" + height +
+                    " exceeds " + MAX_COVER_WIDTH + "x" + MAX_COVER_HEIGHT +
+                    ", downsampling with inSampleSize=" + inSampleSize);
+        }
+
+        BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
+        decodeOptions.inSampleSize = inSampleSize;
+        return BitmapFactory.decodeByteArray(coverImage, 0, coverImage.length, decodeOptions);
     }
 
     private String serializeSnapshot(Snapshot snapshot) throws Exception {

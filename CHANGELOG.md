@@ -7,6 +7,167 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.13.0] - 2026-02-13
+
+### Fixed
+- Added `PlayGamesSdk.initialize(activity)` call in `AuthBridge` constructor before `PlayGames.getGamesSignInClient()` — PGS v2 requires explicit SDK initialization, missing call caused `DEVELOPER_ERROR` on all Play Games operations
+
+---
+
+## [1.12.0] - 2026-02-13
+
+### Added
+- `GamesServicesConfig.webClientId` field — stores Web Application OAuth 2.0 Client ID for `RequestServerSideAccessAsync`, eliminating hardcoded client IDs in game code
+- Setup Wizard now persists `webClientId` to `GamesServicesConfig` asset on completion
+- Setup Wizard loads existing `webClientId` from config when re-opened
+
+---
+
+## [1.11.0] - 2026-02-13
+
+### Added
+- **`GamesException` base class** — all 7 package exception types now inherit from `GamesException` instead of `System.Exception`; enables `catch (GamesException)` for blanket error handling across all services
+- `GamesException.ErrorCode` property — shared integer error code accessible from any package exception without casting
+
+### Changed
+- `GamesAuthException`, `GamesAchievementException`, `GamesLeaderboardException`, `GamesCloudSaveException`, `GamesStatsException`, `GamesEventsException` — now inherit from `GamesException` (backward-compatible; existing `catch` blocks still work)
+- `GamesNativeBridgeException` — inherits from `GamesException` with `ErrorCode = GamesErrorCodes.BridgeNotInitialized`
+- `UnityMainThreadDispatcher` — replaced `lock` + `Queue<Action>` with `ConcurrentQueue<Action>` for lock-free thread safety; removed `_lock` field
+- `JsonArrayParser.Parse` — added null/empty/`[]`/`{}` guard clause to prevent `JsonUtility` parse errors from malformed JNI data
+- ProGuard rules — added `-assumenosideeffects` to strip `Log.v()` and `Log.d()` calls in consumer release builds (R8); `Log.i`/`Log.w`/`Log.e` preserved
+
+### Removed
+- Unused `using System.Linq` from `MockLeaderboardProvider`
+
+---
+
+## [1.10.0] - 2026-02-13
+
+### Added
+- **`JniConstants` static class** — centralizes all 13 Java class/interface name strings (bridge + callback); eliminates Shotgun Surgery risk when Java packages change
+- **`GamesNativeBridgeException`** — specific exception type for JNI bridge initialization failures, wraps inner Java exception with `JavaClassName` property
+- `GamesServicesConfig.jniTimeoutSeconds` — configurable JNI operation timeout (5-120 seconds, default 30) via ScriptableObject Inspector; replaces hardcoded 30-second constant
+
+### Changed
+- All 5 JNI controllers (`Achievement`, `Leaderboard`, `CloudSave`, `Stats`, `Events`) — `JavaClassName` override now uses `JniConstants.*Bridge` instead of hardcoded strings
+- All 6 callback proxies (`Auth`, `Achievement`, `Leaderboard`, `CloudSave`, `Stats`, `Events`) — `base(...)` constructor uses `JniConstants.*Callback` instead of hardcoded strings
+- `GamesAuthController` — uses `JniConstants.AuthBridge` and `JniConstants.UnityPlayer`
+- `JniBridgeBase` — uses `JniConstants.UnityPlayer`; throws `GamesNativeBridgeException` instead of rethrowing generic `Exception`; logs full stack trace instead of `ex.Message`
+- `JniTaskExtensions` — reads timeout from `GamesServicesManager.Config.jniTimeoutSeconds` with 30-second fallback
+
+---
+
+## [1.9.0] - 2026-02-13
+
+### Changed
+- `UnityMainThreadDispatcher` — exception logging now includes full stack trace (`{e}` instead of `{e.Message}`)
+- `MockEventsProvider.IncrementEventAsync` — added `await Task.Delay(50, ct)` for consistent async behavior with other mock providers
+
+### Fixed
+- `MockCloudSaveProvider.OpenSnapshotAsync` — now throws `GamesCloudSaveException` when `createIfNotFound=false` and snapshot doesn't exist (matches real controller behavior)
+- `MockCloudSaveProvider.LoadAsync` — correctly returns null for missing snapshots instead of throwing
+
+---
+
+## [1.8.0] - 2026-02-13
+
+### Added
+- **`JniBridgeBase` abstract class** — encapsulates JNI initialization (get Activity → create bridge → set callback → IDisposable) shared by 5 controllers; reduces ~25 lines per controller
+- **`GamesErrorCodes` static class** — centralized error code constants (`BridgeNotInitialized=-100`, `ApiNotAvailable=-1`, `Unknown=0`, `UserCancelled=1`, `NetworkError=2`, `NotAuthenticated=3`, `InternalError=100`)
+- **`JsonArrayParser`** — shared `Parse<TWrapper, T>()` helper for `JsonUtility` array deserialization via `{"items":...}` wrapping pattern
+
+### Changed
+- `GamesAchievementController`, `GamesLeaderboardController`, `GamesCloudSaveController`, `GamesStatsController`, `GamesEventsController` — now inherit from `JniBridgeBase` instead of managing JNI bridge directly
+- Mock providers — replaced magic number error codes with `GamesErrorCodes` constants
+
+---
+
+## [1.7.0] - 2026-02-13
+
+### Added
+- **`TcsGuard`** — concurrent `TaskCompletionSource` protection; `Replace(ref field)` cancels previous pending TCS before creating new one, preventing silent overwrites
+- **`JniTaskExtensions`** — `WithJniTimeout()` extension method for TCS-based async operations; prevents indefinite hangs when Java callbacks never arrive (30-second default)
+
+### Fixed
+- **Thread safety** — singleton instance fields (`GamesServicesManager._instance`, `UnityMainThreadDispatcher._instance`) now marked `volatile` for correct double-checked locking under C# memory model
+- **Memory leaks** — all 6 controllers implement `IDisposable`; `GamesServicesManager.OnDestroy()` calls `Dispose()` on all providers, releasing JNI bridges and cancelling pending operations
+- **TCS overwrites** — all controller async methods now use `TcsGuard.Replace()` instead of raw `new TaskCompletionSource<T>()`
+- **Achievement cache** — `IsAchievementUnlockedInCache()` now checks memory dict before PlayerPrefs (was reversed)
+- **Mock provider gaps** — `MockLeaderboardProvider.SubmitScoreAsync` now persists scores with best-score semantics and rank recalculation; `MockAchievementProvider` unlock/increment/reveal correctly throws for unknown achievement IDs
+
+---
+
+## [1.6.0] - 2026-02-13
+
+### Added
+- **Typed Exceptions** — service-specific exception classes for granular error handling:
+  - `GamesCloudSaveException` with `GamesCloudSaveError` (wraps `CloudSaveErrorType`)
+  - `GamesAchievementException` with `GamesAchievementError` (wraps `AchievementErrorType`)
+  - `GamesLeaderboardException` with `GamesLeaderboardError` (wraps `LeaderboardErrorType`)
+  - `GamesStatsException` with `GamesStatsError` (wraps `StatsErrorType`)
+  - `GamesEventsException` with `GamesEventsError` (event-specific error info)
+- **UniTask Optional Support** — `BizSim.GPlay.Games.UniTask` assembly with extension methods for all provider interfaces; compiled only when `com.cysharp.unitask` package is installed (via `UNITASK_AVAILABLE` define constraint)
+- `GamesEventsError.ToString()` — human-readable error formatting
+
+### Fixed
+- **Saved Games UI** — `showSavedGamesUI` no longer fires `onSavedGamesUIResult(null)` immediately on Intent launch; static `CloudSaveBridge.handleActivityResult()` method properly captures user selection via `onActivityResult` with `EXTRA_SNAPSHOT_METADATA` / `EXTRA_SNAPSHOT_NEW` handling
+
+### Changed
+- All controllers now throw typed exceptions instead of generic `Exception`:
+  - `GamesCloudSaveController` → `GamesCloudSaveException`
+  - `GamesAchievementController` → `GamesAchievementException`
+  - `GamesLeaderboardController` → `GamesLeaderboardException`
+  - `GamesStatsController` → `GamesStatsException`
+  - `GamesEventsController` → `GamesEventsException`
+  - `MockAchievementProvider` → `GamesAchievementException`
+
+---
+
+## [1.5.0] - 2026-02-13
+
+### Added
+- **SaveGameMetadata model** — structured metadata class with description, playedTimeMillis, coverImage (PNG, max 800KB, 640x360 recommended), and progressValue (0-100 percentage for Sidekick display)
+- `SaveAsync(filename, data, metadata)` overload — convenience method with full metadata support and runtime validation
+- `ValidateMetadata()` — runtime enforcement when `requireCloudSaveMetadata` is true: Warning for missing description/playedTime/coverImage, Error for coverImage > 800KB
+- `DownloadCoverImageAsync(coverImageUri)` — downloads cover image from Google Cloud URI to `Texture2D`; mock returns 1x1 placeholder
+- Metadata validation in `CommitSnapshotAsync` — warns when `requireCloudSaveMetadata` is enabled but description or playedTime is missing
+- **Sidekick Readiness Validator** — Editor window at BizSim > Google Play Games > Sidekick Readiness Check with 10-check pass/fail checklist and remediation guidance
+- Documentation: `SIDEKICK-GUIDE.md` — comprehensive Sidekick integration guide with cover image write/read/display patterns
+- Documentation: `QUALITY-CHECKLIST.md` — full PGS Quality Checklist with achievement, cloud save, leaderboard, and events best practices
+- Documentation: `LEVEL-UP-PROGRAM.md` — Level Up program overview, tier deadlines, and migration guide from v1.0.1
+
+### Changed
+- `IGamesCloudSaveProvider` — added `SaveAsync` metadata overload and `DownloadCoverImageAsync` method
+- `MockCloudSaveProvider` — supports metadata overload and placeholder cover image download
+
+---
+
+## [1.4.0] - 2026-02-13
+
+### Added
+- **Events API** — full implementation of Google Play Games Events with batching support
+- `IGamesEventsProvider` interface — `IncrementEventAsync`, `LoadEventsAsync`, `LoadEventAsync`
+- `GamesEventsController` — JNI bridge with Dictionary-based batching (5-second flush interval), swap-and-clear pattern for thread safety
+- `GamesEvent` model — serializable event data (eventId, name, description, value, imageUri, isVisible)
+- `GamesEventsError` model — event-specific error reporting
+- `EventsCallbackProxy` — AndroidJavaProxy for Java `IEventsCallback` interface
+- `MockEventsProvider` — in-memory event counter for Editor testing
+- Java `EventsBridge` — Android bridge for `PlayGames.getEventsClient()` with increment, load all, and load single event support
+- `GamesServicesManager.Events` static accessor for events provider
+- `OnApplicationPause`/`OnApplicationQuit` lifecycle hooks — flush pending event increments on app pause and quit to prevent data loss
+- `UnityMainThreadDispatcher.IsMainThread` property — thread safety check for JNI-sensitive operations
+
+### Changed
+- `GamesServicesManager.InitializeServices()` now conditionally initializes events provider based on `enableEvents` config toggle
+- `GamesServicesManager.ResolveConfig()` simplified — removed legacy `GamesServicesMockConfig` fallback (was deprecated in v1.3.0)
+
+### Removed
+- `GamesServicesMockConfig` — deleted entirely (deprecated since v1.3.0). Use `GamesServicesConfig` instead.
+- `GamesServicesMockConfigEditor` — custom inspector for removed config class
+- Legacy 3-tier config resolution — `CreateConfigFromLegacy()` bridge method removed
+
+---
+
 ## [1.3.0] - 2026-02-13
 
 ### Added
@@ -198,7 +359,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Gradle**: Auto-inject PGS v2 via mainTemplate/settingsTemplate
 
 ### Known Limitations
-- Phase 6 (Friends & Events) not implemented
+- Phase 6 (Friends) not implemented
 - Android-only (iOS not supported)
 - Achievement icons configured in Google Play Console (not Unity)
 

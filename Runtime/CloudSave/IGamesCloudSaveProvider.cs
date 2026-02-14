@@ -3,6 +3,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
@@ -86,6 +87,33 @@ namespace BizSim.GPlay.Games
         /// <param name="ct">Cancellation token</param>
         /// <returns>Task that completes when save succeeds</returns>
         Task SaveAsync(string filename, byte[] data, string description = null, CancellationToken ct = default);
+
+        /// <summary>
+        /// Convenience method: Save data with full metadata in one call.
+        /// Validates metadata for Sidekick Tier 2 compliance when requireCloudSaveMetadata is enabled.
+        /// </summary>
+        Task SaveAsync(string filename, byte[] data, SaveGameMetadata metadata, CancellationToken ct = default);
+
+        /// <summary>
+        /// Downloads a cover image from Google servers using the URI from SnapshotHandle.coverImageUri.
+        /// WARNING: The returned Texture2D uses unmanaged GPU memory that is NOT garbage collected.
+        /// Caller MUST call UnityEngine.Object.Destroy(texture) when the texture is no longer needed,
+        /// otherwise GPU memory will leak.
+        /// </summary>
+        Task<Texture2D> DownloadCoverImageAsync(string coverImageUri, CancellationToken ct = default);
+
+        /// <summary>
+        /// Releases a cover image texture from internal cache and destroys the GPU resource.
+        /// Call this when a cover image is no longer displayed (e.g., scrolling off-screen in a save list).
+        /// </summary>
+        /// <param name="texture">The texture returned by DownloadCoverImageAsync</param>
+        void ReleaseCoverImage(Texture2D texture);
+
+        /// <summary>
+        /// Releases all cached cover image textures and destroys their GPU resources.
+        /// Call this when leaving the saved games UI to free all GPU memory at once.
+        /// </summary>
+        void ReleaseAllCoverImages();
 
         /// <summary>
         /// Convenience method: Load data in one call (Open → Read).

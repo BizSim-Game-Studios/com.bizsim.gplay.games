@@ -1,37 +1,29 @@
 // Copyright (c) BizSim Game Studios. All rights reserved.
 
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
+using System.Threading;
 using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
-    /// <summary>
-    /// Marshals Java callback invocations from background threads to Unity's main thread.
-    /// Java callbacks execute on arbitrary threads — Unity API calls MUST happen on main thread.
-    /// </summary>
     [DefaultExecutionOrder(-1000)]
     internal class UnityMainThreadDispatcher : MonoBehaviour
     {
-        private static UnityMainThreadDispatcher _instance;
-        private static readonly Queue<Action> _executionQueue = new Queue<Action>();
-        private static readonly object _lock = new object();
+        private static volatile UnityMainThreadDispatcher _instance;
+        private static readonly ConcurrentQueue<Action> _executionQueue = new ConcurrentQueue<Action>();
         private static bool _isQuitting;
+        private static int _mainThreadId;
 
-        /// <summary>
-        /// Enqueues an action to be executed on the Unity main thread.
-        /// Thread-safe — can be called from Java callbacks on background threads.
-        /// </summary>
+        public static bool IsMainThread => Thread.CurrentThread.ManagedThreadId == _mainThreadId;
+
         public static void Enqueue(Action action)
         {
             if (action == null)
                 throw new ArgumentNullException(nameof(action));
             if (_isQuitting) return;
 
-            lock (_lock)
-            {
-                _executionQueue.Enqueue(action);
-            }
+            _executionQueue.Enqueue(action);
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -39,6 +31,7 @@ namespace BizSim.GPlay.Games
         {
             if (_instance != null || _isQuitting) return;
 
+            _mainThreadId = Thread.CurrentThread.ManagedThreadId;
             _isQuitting = false;
             Application.quitting += () => _isQuitting = true;
 
@@ -49,18 +42,15 @@ namespace BizSim.GPlay.Games
 
         private void Update()
         {
-            lock (_lock)
+            while (_executionQueue.TryDequeue(out var action))
             {
-                while (_executionQueue.Count > 0)
+                try
                 {
-                    try
-                    {
-                        _executionQueue.Dequeue().Invoke();
-                    }
-                    catch (Exception e)
-                    {
-                        BizSimGamesLogger.Error($"Main thread callback error: {e.Message}");
-                    }
+                    action.Invoke();
+                }
+                catch (Exception e)
+                {
+                    BizSimGamesLogger.Error($"Main thread callback error: {e}");
                 }
             }
         }

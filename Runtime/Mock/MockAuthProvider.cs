@@ -33,7 +33,7 @@ namespace BizSim.GPlay.Games
                 BizSimGamesLogger.Warning("[Mock] No config - simulating auth failure");
                 var error = new GamesAuthError
                 {
-                    errorCode = 3,
+                    errorCode = GamesErrorCodes.NotAuthenticated,
                     errorMessage = "Mock config not assigned",
                     isRetryable = false
                 };
@@ -84,7 +84,7 @@ namespace BizSim.GPlay.Games
             {
                 throw new GamesAuthException(new GamesAuthError
                 {
-                    errorCode = 3,
+                    errorCode = GamesErrorCodes.NotAuthenticated,
                     errorMessage = "Not authenticated - call AuthenticateAsync first",
                     isRetryable = false
                 });
@@ -109,7 +109,7 @@ namespace BizSim.GPlay.Games
             {
                 throw new GamesAuthException(new GamesAuthError
                 {
-                    errorCode = 3,
+                    errorCode = GamesErrorCodes.NotAuthenticated,
                     errorMessage = "Not authenticated - call AuthenticateAsync first",
                     isRetryable = false
                 });

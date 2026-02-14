@@ -99,4 +99,15 @@ namespace BizSim.GPlay.Games
         /// </summary>
         InternalError = 100
     }
+
+    public class GamesAchievementException : GamesException
+    {
+        public GamesAchievementError Error { get; }
+
+        public GamesAchievementException(GamesAchievementError error)
+            : base(error?.errorCode ?? 0, $"Achievement operation failed: {error}")
+        {
+            Error = error ?? throw new ArgumentNullException(nameof(error));
+        }
+    }
 }

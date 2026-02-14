@@ -9,7 +9,7 @@ namespace BizSim.GPlay.Games
         private readonly GamesCloudSaveController _controller;
 
         public CloudSaveCallbackProxy(GamesCloudSaveController controller)
-            : base("com.bizsim.gplay.games.cloudsave.ICloudSaveCallback")
+            : base(JniConstants.CloudSaveCallback)
         {
             _controller = controller;
         }

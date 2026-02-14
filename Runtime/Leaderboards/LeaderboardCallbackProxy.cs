@@ -9,7 +9,7 @@ namespace BizSim.GPlay.Games
         private readonly GamesLeaderboardController _controller;
 
         public LeaderboardCallbackProxy(GamesLeaderboardController controller)
-            : base("com.bizsim.gplay.games.leaderboards.ILeaderboardCallback")
+            : base(JniConstants.LeaderboardCallback)
         {
             _controller = controller;
         }

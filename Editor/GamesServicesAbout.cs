@@ -128,23 +128,30 @@ namespace BizSim.GPlay.Games.Editor
         {
             EditorGUILayout.LabelField("Implementation Status", EditorStyles.boldLabel);
 
-            DrawStatusRow("✅ Phase 1: Authentication", true);
-            DrawStatusRow("✅ Phase 2: Achievements", true);
-            DrawStatusRow("✅ Phase 3: Leaderboards", true);
-            DrawStatusRow("✅ Phase 4: Cloud Save (Saved Games)", true);
-            DrawStatusRow("✅ Phase 5: Player Stats", true);
-            DrawStatusRow("⏳ Phase 6: Friends & Events (Future)", false);
+            DrawStatusRow("Phase 1: Authentication", true);
+            DrawStatusRow("Phase 2: Achievements", true);
+            DrawStatusRow("Phase 3: Leaderboards", true);
+            DrawStatusRow("Phase 4: Cloud Save (Saved Games)", true);
+            DrawStatusRow("Phase 5: Player Stats", true);
+            DrawStatusRow("Phase 6: Events API", true);
+            DrawStatusRow("Phase 7: Sidekick Integration", true);
 
             EditorGUILayout.Space(10);
             EditorGUILayout.HelpBox(
-                "✅ v1.0.0 COMPLETE - All core features implemented!\n\n" +
-                "Implemented Features:\n" +
-                "• Authentication (silent + manual, server-side access)\n" +
-                "• Achievements (unlock, increment, reveal, batch operations)\n" +
-                "• Leaderboards (submit scores, load rankings, scoretags)\n" +
-                "• Cloud Save (transaction-based with conflict resolution)\n" +
-                "• Player Stats (churn prediction, engagement metrics)\n\n" +
-                "Next: Phase 6 (Friends & Events) - Planned for future release",
+                "v" + packageVersion + " - All features implemented\n\n" +
+                "Core Services:\n" +
+                "  Authentication (silent + manual, server-side access, auth scopes)\n" +
+                "  Achievements (unlock, increment, reveal, batch operations)\n" +
+                "  Leaderboards (submit scores, load rankings, scoretags)\n" +
+                "  Cloud Save (transaction-based, conflict resolution, metadata)\n" +
+                "  Player Stats (churn prediction, engagement metrics)\n" +
+                "  Events (batched increment, load, flush lifecycle)\n\n" +
+                "Sidekick Ready:\n" +
+                "  Unified config with service toggles\n" +
+                "  Cloud save metadata (cover image, description, played time)\n" +
+                "  Readiness validator (Editor window)\n" +
+                "  Typed exceptions per service\n" +
+                "  Optional UniTask support",
                 MessageType.Info);
         }
 

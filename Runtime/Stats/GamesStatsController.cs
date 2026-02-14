@@ -7,49 +7,36 @@ using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
-    internal class GamesStatsController : IGamesStatsProvider
+    internal class GamesStatsController : JniBridgeBase, IGamesStatsProvider
     {
-        private AndroidJavaObject _statsBridge;
         private StatsCallbackProxy _callbackProxy;
         private TaskCompletionSource<GamesPlayerStats> _loadTcs;
 
         public event Action<GamesPlayerStats> OnStatsLoaded;
         public event Action<GamesStatsError> OnStatsError;
 
+        protected override string JavaClassName => JniConstants.StatsBridge;
+
+        protected override AndroidJavaProxy CreateCallbackProxy()
+        {
+            _callbackProxy = new StatsCallbackProxy(this);
+            return _callbackProxy;
+        }
+
         public GamesStatsController()
         {
             InitializeBridge();
         }
 
-        private void InitializeBridge()
-        {
-            try
-            {
-                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
-                {
-                    _statsBridge = new AndroidJavaObject("com.bizsim.gplay.games.stats.StatsBridge", activity);
-                    _callbackProxy = new StatsCallbackProxy(this);
-                    _statsBridge.Call("setCallback", _callbackProxy);
-                    BizSimGamesLogger.Info("StatsBridge initialized");
-                }
-            }
-            catch (Exception ex)
-            {
-                BizSimGamesLogger.Error($"Failed to initialize StatsBridge: {ex.Message}");
-                throw;
-            }
-        }
-
         public async Task<GamesPlayerStats> LoadPlayerStatsAsync(bool forceReload = false, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            _loadTcs = new TaskCompletionSource<GamesPlayerStats>();
+            var tcs = TcsGuard.Replace(ref _loadTcs);
 
-            using (ct.Register(() => _loadTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
-                _statsBridge.Call("loadPlayerStats", forceReload);
-                return await _loadTcs.Task;
+                CallBridge("loadPlayerStats", forceReload);
+                return await tcs.Task;
             }
         }
 
@@ -71,7 +58,13 @@ namespace BizSim.GPlay.Games
         {
             var error = new GamesStatsError(errorCode, errorMessage);
             OnStatsError?.Invoke(error);
-            _loadTcs?.TrySetException(new Exception(error.ToString()));
+            _loadTcs?.TrySetException(new GamesStatsException(error));
+        }
+
+        protected override void OnDispose()
+        {
+            _loadTcs?.TrySetCanceled();
+            _callbackProxy = null;
         }
     }
 }

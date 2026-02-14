@@ -2,13 +2,13 @@
 
 [![Unity 6000.3+](https://img.shields.io/badge/Unity-6000.3%2B-blue.svg)](https://unity.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE.md)
-[![Version](https://img.shields.io/badge/Version-1.2.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.6.0-orange.svg)](CHANGELOG.md)
 
 **Unity bridge for Google Play Games Services v2**
 
 > **⚠️ Unofficial package.** This is a community-built Unity bridge for [Google Play Games Services v2](https://developers.google.com/games/services). It is **not** an official Google product.
 
-Version: **1.2.0**
+Version: **1.6.0**
 Unity: 6000.3+
 Platform: Android
 License: MIT (package code) — see [Third-Party Licenses](#-third-party-licenses) for SDK terms
@@ -18,6 +18,7 @@ License: MIT (package code) — see [Third-Party Licenses](#-third-party-license
 ## Table of Contents
 
 - [Features](#-features)
+- [Sidekick Integration](#-sidekick-integration)
 - [Google Play Compliance](#-critical-google-play-compliance-requirements)
 - [Installation](#-installation)
 - [Quick Start](#-quick-start)
@@ -34,8 +35,38 @@ License: MIT (package code) — see [Third-Party Licenses](#-third-party-license
 - ✅ **Authentication** - Silent + manual sign-in with PGS v2, server-side access tokens
 - ✅ **Achievements** - Unlock, increment, reveal, batch operations, local caching
 - ✅ **Leaderboards** - Submit scores, load top/player-centered rankings, scoretags
-- ✅ **Cloud Save** - Transaction-based saved games with automatic conflict resolution
+- ✅ **Cloud Save** - Transaction-based saved games with metadata, cover image, conflict resolution
+- ✅ **Events** - Batched event tracking with 5s flush interval, pause/quit flush
 - ✅ **Player Stats** - Churn prediction, spend probability, engagement metrics
+- ✅ **Sidekick Ready** - Unified config, readiness validator, Tier 1 & 2 compliance
+
+---
+
+## 🤖 Sidekick Integration
+
+This package supports Google Play's Sidekick AI assistant. Use `GamesServicesConfig` to configure services and the **Sidekick Readiness Check** editor window to validate compliance.
+
+| Tier | Requirements | Deadline |
+|------|-------------|----------|
+| Tier 1 | Auth + 10+ Achievements | July 2026 |
+| Tier 2 | Tier 1 + Cloud Save with metadata | November 2026 |
+
+```csharp
+// Save with full Sidekick metadata
+var metadata = new SaveGameMetadata
+{
+    description = "Level 5 - Factory District",
+    playedTimeMillis = totalPlayTimeMs,
+    coverImage = screenshotPngBytes,  // max 800KB, 640x360
+    progressValue = 45
+};
+await GamesServicesManager.CloudSave.SaveAsync("slot1", data, metadata);
+
+// Track events
+await GamesServicesManager.Events.IncrementEventAsync("vehicle_dismantled", 1);
+```
+
+See `Documentation~/SIDEKICK-GUIDE.md` for full integration guide.
 
 ---
 

@@ -6,12 +6,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace BizSim.GPlay.Games
 {
-    internal class GamesLeaderboardController : IGamesLeaderboardProvider
+    internal class GamesLeaderboardController : JniBridgeBase, IGamesLeaderboardProvider
     {
-        private AndroidJavaObject _leaderboardBridge;
         private LeaderboardCallbackProxy _callbackProxy;
 
         private TaskCompletionSource<bool> _submitTcs;
@@ -22,65 +22,52 @@ namespace BizSim.GPlay.Games
         public event Action<string, List<GamesLeaderboardEntry>> OnScoresLoaded;
         public event Action<GamesLeaderboardError> OnLeaderboardError;
 
+        protected override string JavaClassName => JniConstants.LeaderboardBridge;
+
+        protected override AndroidJavaProxy CreateCallbackProxy()
+        {
+            _callbackProxy = new LeaderboardCallbackProxy(this);
+            return _callbackProxy;
+        }
+
         public GamesLeaderboardController()
         {
             InitializeBridge();
         }
 
-        private void InitializeBridge()
-        {
-            try
-            {
-                using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
-                using (var activity = unityPlayer.GetStatic<AndroidJavaObject>("currentActivity"))
-                {
-                    _leaderboardBridge = new AndroidJavaObject(
-                        "com.bizsim.gplay.games.leaderboards.LeaderboardBridge", activity);
-                    _callbackProxy = new LeaderboardCallbackProxy(this);
-                    _leaderboardBridge.Call("setCallback", _callbackProxy);
-                    BizSimGamesLogger.Info("LeaderboardBridge initialized");
-                }
-            }
-            catch (Exception ex)
-            {
-                BizSimGamesLogger.Error($"Failed to initialize LeaderboardBridge: {ex.Message}");
-                throw;
-            }
-        }
-
         public async Task SubmitScoreAsync(string leaderboardId, long score, string scoreTag = null, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            _submitTcs = new TaskCompletionSource<bool>();
+            var tcs = TcsGuard.Replace(ref _submitTcs);
 
-            using (ct.Register(() => _submitTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
-                _leaderboardBridge.Call("submitScore", leaderboardId, score, scoreTag ?? "");
-                await _submitTcs.Task;
+                CallBridge("submitScore", leaderboardId, score, scoreTag ?? "");
+                await tcs.Task;
             }
         }
 
         public async Task ShowLeaderboardUIAsync(string leaderboardId, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            _showUITcs = new TaskCompletionSource<bool>();
+            var tcs = TcsGuard.Replace(ref _showUITcs);
 
-            using (ct.Register(() => _showUITcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
-                _leaderboardBridge.Call("showLeaderboardUI", leaderboardId);
-                await _showUITcs.Task;
+                CallBridge("showLeaderboardUI", leaderboardId);
+                await tcs.Task;
             }
         }
 
         public async Task ShowAllLeaderboardsUIAsync(CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            _showUITcs = new TaskCompletionSource<bool>();
+            var tcs = TcsGuard.Replace(ref _showUITcs);
 
-            using (ct.Register(() => _showUITcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
-                _leaderboardBridge.Call("showAllLeaderboardsUI");
-                await _showUITcs.Task;
+                CallBridge("showAllLeaderboardsUI");
+                await tcs.Task;
             }
         }
 
@@ -90,12 +77,12 @@ namespace BizSim.GPlay.Games
             int maxResults = 25, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            _loadTcs = new TaskCompletionSource<List<GamesLeaderboardEntry>>();
+            var tcs = TcsGuard.Replace(ref _loadTcs);
 
-            using (ct.Register(() => _loadTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
-                _leaderboardBridge.Call("loadTopScores", leaderboardId, (int)timeSpan, (int)collection, maxResults);
-                return await _loadTcs.Task;
+                CallBridge("loadTopScores", leaderboardId, (int)timeSpan, (int)collection, maxResults);
+                return await tcs.Task;
             }
         }
 
@@ -105,12 +92,12 @@ namespace BizSim.GPlay.Games
             int maxResults = 25, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            _loadTcs = new TaskCompletionSource<List<GamesLeaderboardEntry>>();
+            var tcs = TcsGuard.Replace(ref _loadTcs);
 
-            using (ct.Register(() => _loadTcs.TrySetCanceled()))
+            using (ct.Register(() => tcs.TrySetCanceled()))
             {
-                _leaderboardBridge.Call("loadPlayerCenteredScores", leaderboardId, (int)timeSpan, (int)collection, maxResults);
-                return await _loadTcs.Task;
+                CallBridge("loadPlayerCenteredScores", leaderboardId, (int)timeSpan, (int)collection, maxResults);
+                return await tcs.Task;
             }
         }
 
@@ -124,7 +111,8 @@ namespace BizSim.GPlay.Games
         {
             try
             {
-                var scores = JsonUtility.FromJson<LeaderboardScoresList>("{\"items\":" + scoresJson + "}").items.ToList();
+                var items = JsonArrayParser.Parse<LeaderboardScoresList, GamesLeaderboardEntry>(scoresJson);
+                var scores = items.ToList();
                 OnScoresLoaded?.Invoke(leaderboardId, scores);
                 _loadTcs?.TrySetResult(scores);
             }
@@ -144,16 +132,25 @@ namespace BizSim.GPlay.Games
             var error = new GamesLeaderboardError(errorCode, errorMessage, leaderboardId);
             OnLeaderboardError?.Invoke(error);
 
-            var exception = new Exception(error.ToString());
+            var exception = new GamesLeaderboardException(error);
             _submitTcs?.TrySetException(exception);
             _showUITcs?.TrySetException(exception);
             _loadTcs?.TrySetException(exception);
         }
 
-        [Serializable]
-        private class LeaderboardScoresList
+        [Serializable, Preserve]
+        private class LeaderboardScoresList : IArrayWrapper<GamesLeaderboardEntry>
         {
             public GamesLeaderboardEntry[] items;
+            public GamesLeaderboardEntry[] Items => items;
+        }
+
+        protected override void OnDispose()
+        {
+            _submitTcs?.TrySetCanceled();
+            _showUITcs?.TrySetCanceled();
+            _loadTcs?.TrySetCanceled();
+            _callbackProxy = null;
         }
     }
 }

@@ -50,6 +50,12 @@
     void onStatsError(int, java.lang.String);
 }
 
+-keepclassmembers interface com.bizsim.gplay.games.events.IEventsCallback {
+    void onEventsLoaded(java.lang.String);
+    void onEventLoaded(java.lang.String);
+    void onEventsError(int, java.lang.String);
+}
+
 # Google Play Games SDK v2 (accessed via JNI from bridge classes)
 -keep class com.google.android.gms.games.** { *; }
 -keep interface com.google.android.gms.games.** { *; }

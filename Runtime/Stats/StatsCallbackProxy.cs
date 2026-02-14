@@ -9,7 +9,7 @@ namespace BizSim.GPlay.Games
         private readonly GamesStatsController _controller;
 
         public StatsCallbackProxy(GamesStatsController controller)
-            : base("com.bizsim.gplay.games.stats.IStatsCallback")
+            : base(JniConstants.StatsCallback)
         {
             _controller = controller;
         }

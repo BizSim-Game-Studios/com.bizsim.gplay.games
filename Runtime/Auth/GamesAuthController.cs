@@ -8,11 +8,7 @@ using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
-    /// <summary>
-    /// Android implementation of IGamesAuthProvider using JNI bridge to PGS v2 SDK.
-    /// Uses AndroidJavaProxy for ProGuard-safe callbacks from Java.
-    /// </summary>
-    internal class GamesAuthController : IGamesAuthProvider
+    internal class GamesAuthController : IGamesAuthProvider, IDisposable
     {
         private AndroidJavaObject _authBridge;
         private AuthCallbackProxy _callbackProxy;
@@ -20,6 +16,7 @@ namespace BizSim.GPlay.Games
         private TaskCompletionSource<string> _serverAccessTaskSource;
         private TaskCompletionSource<GamesAuthResponse> _scopedAccessTaskSource;
         private CancellationTokenSource _destroyTokenSource;
+        private bool _disposed;
 
         private GamesPlayer _currentPlayer;
         private bool _isAuthenticated;
@@ -43,13 +40,11 @@ namespace BizSim.GPlay.Games
             {
                 BizSimGamesLogger.Info("Initializing JNI bridge for authentication");
 
-                // Get AuthBridge singleton from Java
-                using (var bridgeClass = new AndroidJavaClass("com.bizsim.gplay.games.AuthBridge"))
+                using (var bridgeClass = new AndroidJavaClass(JniConstants.AuthBridge))
                 {
                     _authBridge = bridgeClass.CallStatic<AndroidJavaObject>("getInstance", GetUnityActivity());
                 }
 
-                // Create callback proxy (AndroidJavaProxy for ProGuard safety)
                 _callbackProxy = new AuthCallbackProxy(this);
                 _authBridge.Call("setCallback", _callbackProxy);
 
@@ -71,17 +66,15 @@ namespace BizSim.GPlay.Games
             {
                 var error = new GamesAuthError
                 {
-                    errorCode = -100,
+                    errorCode = GamesErrorCodes.BridgeNotInitialized,
                     errorMessage = "JNI bridge not initialized",
                     isRetryable = false
                 };
                 throw new GamesAuthException(error);
             }
 
-            // Create TaskCompletionSource for async operation
-            _authTaskSource = new TaskCompletionSource<GamesPlayer>();
+            var tcs = TcsGuard.Replace(ref _authTaskSource);
 
-            // Link external cancellation + internal destroy token
             using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _destroyTokenSource.Token))
             using (linkedCts.Token.Register(() => _authTaskSource?.TrySetCanceled()))
             {
@@ -90,7 +83,7 @@ namespace BizSim.GPlay.Games
                     BizSimGamesLogger.Info("Calling signIn() on Java bridge");
                     _authBridge.Call("signIn");
 
-                    return await _authTaskSource.Task;
+                    return await tcs.Task.WithJniTimeout(tcs, ct: linkedCts.Token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -102,7 +95,7 @@ namespace BizSim.GPlay.Games
             await Task.CompletedTask;
             throw new GamesAuthException(new GamesAuthError
             {
-                errorCode = -1,
+                errorCode = GamesErrorCodes.ApiNotAvailable,
                 errorMessage = "Not available on this platform",
                 isRetryable = false
             });
@@ -116,7 +109,7 @@ namespace BizSim.GPlay.Games
             {
                 throw new GamesAuthException(new GamesAuthError
                 {
-                    errorCode = 3,
+                    errorCode = GamesErrorCodes.NotAuthenticated,
                     errorMessage = "Not authenticated - call AuthenticateAsync first",
                     isRetryable = false
                 });
@@ -126,13 +119,13 @@ namespace BizSim.GPlay.Games
             {
                 throw new GamesAuthException(new GamesAuthError
                 {
-                    errorCode = -100,
+                    errorCode = GamesErrorCodes.BridgeNotInitialized,
                     errorMessage = "JNI bridge not initialized",
                     isRetryable = false
                 });
             }
 
-            _serverAccessTaskSource = new TaskCompletionSource<string>();
+            var tcs = TcsGuard.Replace(ref _serverAccessTaskSource);
 
             using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _destroyTokenSource.Token))
             using (linkedCts.Token.Register(() => _serverAccessTaskSource?.TrySetCanceled()))
@@ -142,7 +135,7 @@ namespace BizSim.GPlay.Games
                     BizSimGamesLogger.Info($"Requesting server-side access (clientId={serverClientId}, forceRefresh={forceRefresh})");
                     _authBridge.Call("requestServerSideAccess", serverClientId, forceRefresh);
 
-                    return await _serverAccessTaskSource.Task;
+                    return await tcs.Task;
                 }
                 catch (OperationCanceledException)
                 {
@@ -154,17 +147,13 @@ namespace BizSim.GPlay.Games
             await Task.CompletedTask;
             throw new GamesAuthException(new GamesAuthError
             {
-                errorCode = -1,
+                errorCode = GamesErrorCodes.ApiNotAvailable,
                 errorMessage = "Not available on this platform",
                 isRetryable = false
             });
             #endif
         }
 
-        /// <summary>
-        /// Called by AuthCallbackProxy when Java bridge reports auth success.
-        /// Executes on Unity main thread (marshaled by UnityMainThreadDispatcher).
-        /// </summary>
         internal void OnAuthSuccess(string playerId, string displayName, string avatarUri)
         {
             _currentPlayer = new GamesPlayer(playerId, displayName, null, avatarUri);
@@ -176,10 +165,6 @@ namespace BizSim.GPlay.Games
             _authTaskSource?.TrySetResult(_currentPlayer);
         }
 
-        /// <summary>
-        /// Called by AuthCallbackProxy when Java bridge reports auth failure.
-        /// Executes on Unity main thread.
-        /// </summary>
         internal void OnAuthFailure(int errorCode, string errorMessage)
         {
             _isAuthenticated = false;
@@ -189,7 +174,7 @@ namespace BizSim.GPlay.Games
             {
                 errorCode = errorCode,
                 errorMessage = errorMessage,
-                isRetryable = errorCode == 2 // NoConnection is retryable
+                isRetryable = errorCode == GamesErrorCodes.NetworkError
             };
 
             BizSimGamesLogger.Warning($"Auth failure: {error}");
@@ -198,18 +183,12 @@ namespace BizSim.GPlay.Games
             _authTaskSource?.TrySetException(new GamesAuthException(error));
         }
 
-        /// <summary>
-        /// Called by AuthCallbackProxy when server-side access auth code is received.
-        /// </summary>
         internal void OnServerSideAccessSuccess(string serverAuthCode)
         {
             BizSimGamesLogger.Info("Server-side access granted");
             _serverAccessTaskSource?.TrySetResult(serverAuthCode);
         }
 
-        /// <summary>
-        /// Called by AuthCallbackProxy when server-side access request fails.
-        /// </summary>
         internal void OnServerSideAccessFailure(int errorCode, string errorMessage)
         {
             var error = new GamesAuthError
@@ -234,7 +213,7 @@ namespace BizSim.GPlay.Games
             {
                 throw new GamesAuthException(new GamesAuthError
                 {
-                    errorCode = 3,
+                    errorCode = GamesErrorCodes.NotAuthenticated,
                     errorMessage = "Not authenticated - call AuthenticateAsync first",
                     isRetryable = false
                 });
@@ -244,13 +223,13 @@ namespace BizSim.GPlay.Games
             {
                 throw new GamesAuthException(new GamesAuthError
                 {
-                    errorCode = -100,
+                    errorCode = GamesErrorCodes.BridgeNotInitialized,
                     errorMessage = "JNI bridge not initialized",
                     isRetryable = false
                 });
             }
 
-            _scopedAccessTaskSource = new TaskCompletionSource<GamesAuthResponse>();
+            var tcs = TcsGuard.Replace(ref _scopedAccessTaskSource);
 
             using (var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _destroyTokenSource.Token))
             using (linkedCts.Token.Register(() => _scopedAccessTaskSource?.TrySetCanceled()))
@@ -261,7 +240,7 @@ namespace BizSim.GPlay.Games
                     BizSimGamesLogger.Info($"Requesting server-side access with scopes (clientId={serverClientId}, forceRefresh={forceRefresh}, scopes={scopesJson})");
                     _authBridge.Call("requestServerSideAccessWithScopes", serverClientId, forceRefresh, scopesJson);
 
-                    return await _scopedAccessTaskSource.Task;
+                    return await tcs.Task;
                 }
                 catch (OperationCanceledException)
                 {
@@ -273,7 +252,7 @@ namespace BizSim.GPlay.Games
             await Task.CompletedTask;
             throw new GamesAuthException(new GamesAuthError
             {
-                errorCode = -1,
+                errorCode = GamesErrorCodes.ApiNotAvailable,
                 errorMessage = "Not available on this platform",
                 isRetryable = false
             });
@@ -350,16 +329,31 @@ namespace BizSim.GPlay.Games
 
         private static AndroidJavaObject GetUnityActivity()
         {
-            using (var unityPlayer = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+            using (var unityPlayer = new AndroidJavaClass(JniConstants.UnityPlayer))
             {
                 return unityPlayer.GetStatic<AndroidJavaObject>("currentActivity");
             }
         }
 
-        ~GamesAuthController()
+        public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+
             _destroyTokenSource?.Cancel();
             _destroyTokenSource?.Dispose();
+
+            _authTaskSource?.TrySetCanceled();
+            _serverAccessTaskSource?.TrySetCanceled();
+            _scopedAccessTaskSource?.TrySetCanceled();
+
+            if (_callbackProxy != null)
+                _callbackProxy = null;
+
+            #if UNITY_ANDROID && !UNITY_EDITOR
+            _authBridge?.Dispose();
+            _authBridge = null;
+            #endif
         }
     }
 }

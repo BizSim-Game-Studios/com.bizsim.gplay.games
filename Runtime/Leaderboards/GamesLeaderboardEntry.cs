@@ -1,13 +1,14 @@
 // Copyright (c) BizSim Game Studios. All rights reserved.
 
 using System;
+using UnityEngine.Scripting;
 
 namespace BizSim.GPlay.Games
 {
     /// <summary>
     /// Represents a leaderboard score entry.
     /// </summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class GamesLeaderboardEntry
     {
         public string playerId;

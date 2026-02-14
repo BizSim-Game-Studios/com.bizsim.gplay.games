@@ -60,6 +60,13 @@ namespace BizSim.GPlay.Games.Editor
 
             // Try to load existing configuration
             LoadExistingConfig();
+
+            // Load existing webClientId from GamesServicesConfig
+            var config = Resources.Load<GamesServicesConfig>("GamesServicesConfig");
+            if (config != null && !string.IsNullOrEmpty(config.webClientId))
+            {
+                webClientId = config.webClientId;
+            }
         }
 
         private void OnGUI()
@@ -768,6 +775,18 @@ namespace BizSim.GPlay.Games.Editor
 
                 // Generate GPGSIds.cs constants file
                 GenerateGPGSIds();
+
+                // Save webClientId to GamesServicesConfig
+                if (!string.IsNullOrEmpty(webClientId))
+                {
+                    var config = Resources.Load<GamesServicesConfig>("GamesServicesConfig");
+                    if (config != null)
+                    {
+                        config.webClientId = webClientId;
+                        EditorUtility.SetDirty(config);
+                        Debug.Log($"[GamesServices Setup] Saved Web Client ID to GamesServicesConfig");
+                    }
+                }
 
                 // Refresh AssetDatabase
                 AssetDatabase.Refresh();

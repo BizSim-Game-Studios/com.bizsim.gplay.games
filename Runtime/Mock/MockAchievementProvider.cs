@@ -9,12 +9,9 @@ using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
-    /// <summary>
-    /// Mock implementation of achievements provider for Unity Editor testing.
-    /// Uses GamesServicesMockConfig for test data.
-    /// </summary>
     internal class MockAchievementProvider : IGamesAchievementProvider
     {
+        private readonly GamesServicesConfig.MockSettings _mock;
         private Dictionary<string, GamesAchievement> _achievements;
         private HashSet<string> _unlockedAchievements;
 
@@ -25,8 +22,18 @@ namespace BizSim.GPlay.Games
 
         public MockAchievementProvider(GamesServicesConfig.MockSettings mock)
         {
+            _mock = mock;
             InitializeMockData();
             BizSimGamesLogger.Info("MockAchievementProvider initialized");
+        }
+
+        private void ThrowIfSimulatingErrors(string achievementId = null)
+        {
+            if (_mock == null || !_mock.mockSimulateErrors) return;
+
+            var error = new GamesAchievementError(GamesErrorCodes.NetworkError, "Simulated network error", achievementId);
+            OnAchievementError?.Invoke(error);
+            throw new GamesAchievementException(error);
         }
 
         private void InitializeMockData()
@@ -34,7 +41,6 @@ namespace BizSim.GPlay.Games
             _achievements = new Dictionary<string, GamesAchievement>();
             _unlockedAchievements = new HashSet<string>();
 
-            // Create mock achievements
             var mockAchievements = new List<GamesAchievement>
             {
                 new GamesAchievement
@@ -92,20 +98,34 @@ namespace BizSim.GPlay.Games
             };
 
             foreach (var achievement in mockAchievements)
-            {
                 _achievements[achievement.achievementId] = achievement;
+
+            int unlockCount = _mock?.mockUnlockedCount ?? 0;
+            if (unlockCount > 0)
+            {
+                int unlocked = 0;
+                foreach (var achievement in _achievements.Values)
+                {
+                    if (unlocked >= unlockCount) break;
+                    achievement.state = AchievementState.Unlocked;
+                    achievement.unlockedTimestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    _unlockedAchievements.Add(achievement.achievementId);
+                    unlocked++;
+                }
+                BizSimGamesLogger.Info($"[MOCK] Pre-unlocked {unlocked} achievements from config");
             }
         }
 
         public async Task UnlockAchievementAsync(string achievementId, CancellationToken ct = default)
         {
-            await Task.Delay(200, ct); // Simulate network delay
+            await Task.Delay(200, ct);
+            ThrowIfSimulatingErrors(achievementId);
 
             if (!_achievements.ContainsKey(achievementId))
             {
                 var error = new GamesAchievementError(3, "Achievement not found", achievementId);
                 OnAchievementError?.Invoke(error);
-                throw new Exception(error.ToString());
+                throw new GamesAchievementException(error);
             }
 
             var achievement = _achievements[achievementId];
@@ -127,12 +147,13 @@ namespace BizSim.GPlay.Games
         public async Task IncrementAchievementAsync(string achievementId, int steps, CancellationToken ct = default)
         {
             await Task.Delay(200, ct);
+            ThrowIfSimulatingErrors(achievementId);
 
             if (!_achievements.ContainsKey(achievementId))
             {
                 var error = new GamesAchievementError(3, "Achievement not found", achievementId);
                 OnAchievementError?.Invoke(error);
-                throw new Exception(error.ToString());
+                throw new GamesAchievementException(error);
             }
 
             var achievement = _achievements[achievementId];
@@ -141,7 +162,7 @@ namespace BizSim.GPlay.Games
             {
                 var error = new GamesAchievementError(4, "Achievement is not incremental", achievementId);
                 OnAchievementError?.Invoke(error);
-                throw new Exception(error.ToString());
+                throw new GamesAchievementException(error);
             }
 
             achievement.currentSteps = Mathf.Min(achievement.currentSteps + steps, achievement.totalSteps);
@@ -161,12 +182,13 @@ namespace BizSim.GPlay.Games
         public async Task RevealAchievementAsync(string achievementId, CancellationToken ct = default)
         {
             await Task.Delay(200, ct);
+            ThrowIfSimulatingErrors(achievementId);
 
             if (!_achievements.ContainsKey(achievementId))
             {
                 var error = new GamesAchievementError(3, "Achievement not found", achievementId);
                 OnAchievementError?.Invoke(error);
-                throw new Exception(error.ToString());
+                throw new GamesAchievementException(error);
             }
 
             var achievement = _achievements[achievementId];
@@ -182,13 +204,15 @@ namespace BizSim.GPlay.Games
         public async Task ShowAchievementsUIAsync(CancellationToken ct = default)
         {
             await Task.Delay(500, ct);
+            ThrowIfSimulatingErrors();
+
             BizSimGamesLogger.Info("[MOCK] Achievements UI shown (simulated)");
-            Debug.Log("[MockAchievements] Native UI would show here on device");
         }
 
         public async Task<List<GamesAchievement>> LoadAchievementsAsync(bool forceReload = false, CancellationToken ct = default)
         {
             await Task.Delay(300, ct);
+            ThrowIfSimulatingErrors();
 
             BizSimGamesLogger.Info($"[MOCK] Loading achievements (forceReload: {forceReload})");
             return _achievements.Values.ToList();
@@ -197,6 +221,7 @@ namespace BizSim.GPlay.Games
         public async Task UnlockMultipleAsync(List<string> achievementIds, CancellationToken ct = default)
         {
             await Task.Delay(400, ct);
+            ThrowIfSimulatingErrors();
 
             foreach (var achievementId in achievementIds)
             {

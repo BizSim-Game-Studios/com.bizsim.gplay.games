@@ -2,6 +2,7 @@
 
 using System;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace BizSim.GPlay.Games
 {
@@ -9,7 +10,7 @@ namespace BizSim.GPlay.Games
     /// Handle to an open snapshot (transaction context).
     /// Used for Read/Write/Commit operations.
     /// </summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class SnapshotHandle
     {
         /// <summary>

@@ -22,9 +22,27 @@ namespace BizSim.GPlay.Games
         [Tooltip("Enable Play Console Sidekick features. Requires achievements + cloud save at minimum.")]
         public bool sidekickReady = false;
 
+        [Header("Server Authentication")]
+        [Tooltip("Web Application OAuth 2.0 Client ID from Google Cloud Console. Required for RequestServerSideAccessAsync. Set via BizSim > Google Play > Games Services > Setup > Android Setup.")]
+        public string webClientId = "";
+
         [Header("Quality Checklist")]
         public int expectedAchievementCount = 10;
         public bool requireCloudSaveMetadata = true;
+
+        [Header("Cloud Save")]
+        [Tooltip("Seconds to wait for user to resolve a cloud save conflict before auto-resolving. Set to 0 to auto-resolve immediately using timestamp comparison.")]
+        [Range(0, 300)]
+        public int conflictTimeoutSeconds = 60;
+
+        [Header("JNI Bridge")]
+        [Tooltip("Seconds to wait for a JNI bridge operation before timing out. Increase for slow networks, decrease for auth flows that block UI.")]
+        [Range(5, 120)]
+        public int jniTimeoutSeconds = 30;
+
+        [Header("Diagnostics")]
+        [Tooltip("Enable verbose logging in release builds. Use for Sidekick integration testing on devices.")]
+        public bool debugMode = false;
 
         [Header("Editor Mock Settings")]
         [Tooltip("Used in Editor only. Ignored on device.")]
@@ -58,6 +76,14 @@ namespace BizSim.GPlay.Games
 
             [Header("Leaderboards")]
             public long mockScore = 1000;
+
+            [Header("Cloud Save Simulation")]
+            [Tooltip("When enabled, SaveAsync triggers a conflict event when overwriting existing data. Use to test conflict resolution UI in Editor.")]
+            public bool mockSimulateConflict = false;
+
+            [Header("Error Simulation")]
+            [Tooltip("When enabled, mock providers simulate network errors on all operations. Use to test error UI flows in Editor.")]
+            public bool mockSimulateErrors = false;
 
             [Header("Player Stats")]
             [Range(0f, 1f)]

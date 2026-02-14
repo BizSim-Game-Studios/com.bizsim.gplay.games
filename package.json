@@ -2,7 +2,7 @@
   "name": "com.bizsim.gplay.games",
   "displayName": "Google Play Games Services Bridge",
   "description": "Unity bridge for Google Play Games Services v2. Modular async API for Authentication, Achievements, Leaderboards, Saved Games, and Player Stats. ISocialPlatform-independent.",
-  "version": "1.3.0",
+  "version": "1.13.0",
   "unity": "6000.3",
   "changelogUrl": "https://github.com/BizSim-Game-Studios/com.bizsim.gplay.games/blob/main/CHANGELOG.md",
   "documentationUrl": "https://github.com/BizSim-Game-Studios/com.bizsim.gplay.games/blob/main/README.md",
@@ -26,6 +26,7 @@
     "leaderboards",
     "saved-games",
     "cloud-save",
+    "events",
     "android"
   ],
   "repository": {

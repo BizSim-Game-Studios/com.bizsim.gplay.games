@@ -21,7 +21,7 @@ namespace BizSim.GPlay.Games
         /// Interface name MUST match Java: "com.bizsim.gplay.games.callbacks.IAuthCallback"
         /// </summary>
         public AuthCallbackProxy(GamesAuthController controller)
-            : base("com.bizsim.gplay.games.callbacks.IAuthCallback")
+            : base(JniConstants.AuthCallback)
         {
             _controller = controller;
             BizSimGamesLogger.Verbose("AuthCallbackProxy created");

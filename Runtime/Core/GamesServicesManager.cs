@@ -1,13 +1,19 @@
 // Copyright (c) BizSim Game Studios. All rights reserved.
 
+using System;
 using UnityEngine;
 
 namespace BizSim.GPlay.Games
 {
+    /// <summary>
+    /// Central entry point for all Google Play Games Services features.
+    /// Auto-initializes via [RuntimeInitializeOnLoadMethod] before any scene loads.
+    /// On Android, creates JNI bridge controllers. In Editor, creates mock providers.
+    /// </summary>
     [DefaultExecutionOrder(-999)]
     public class GamesServicesManager : MonoBehaviour
     {
-        private static GamesServicesManager _instance;
+        private static volatile GamesServicesManager _instance;
         private static readonly object _lock = new object();
         private static bool _isQuitting;
 
@@ -17,6 +23,7 @@ namespace BizSim.GPlay.Games
         private IGamesLeaderboardProvider _leaderboardsProvider;
         private IGamesCloudSaveProvider _cloudSaveProvider;
         private IGamesStatsProvider _statsProvider;
+        private IGamesEventsProvider _eventsProvider;
 
         public static GamesServicesManager Instance
         {
@@ -38,13 +45,36 @@ namespace BizSim.GPlay.Games
             }
         }
 
+        /// <summary>Active configuration. Loaded from Resources/GamesServicesConfig or defaults.</summary>
         public static GamesServicesConfig Config => Instance?._config;
+
+        /// <summary>Current Sidekick readiness tier based on enabled features.</summary>
         public static SidekickTier SidekickStatus => SidekickReadiness.Evaluate(Instance?._config);
+
+        /// <summary>Authentication provider — sign in, server auth codes, scoped access.</summary>
         public static IGamesAuthProvider Auth => Instance?._authProvider;
+
+        /// <summary>Achievements provider — unlock, increment, reveal, load, batch unlock.</summary>
         public static IGamesAchievementProvider Achievements => Instance?._achievementsProvider;
+
+        /// <summary>Leaderboards provider — submit scores, load top/centered scores, show UI.</summary>
         public static IGamesLeaderboardProvider Leaderboards => Instance?._leaderboardsProvider;
+
+        /// <summary>Cloud save provider — open/read/commit snapshots, conflict resolution, cover images.</summary>
         public static IGamesCloudSaveProvider CloudSave => Instance?._cloudSaveProvider;
+
+        /// <summary>Player stats provider — session length, churn probability, spend percentile.</summary>
         public static IGamesStatsProvider Stats => Instance?._statsProvider;
+
+        /// <summary>Events provider — increment events with batching, load event data.</summary>
+        public static IGamesEventsProvider Events => Instance?._eventsProvider;
+
+        public IGamesAuthProvider AuthProvider => _authProvider;
+        public IGamesAchievementProvider AchievementsProvider => _achievementsProvider;
+        public IGamesLeaderboardProvider LeaderboardsProvider => _leaderboardsProvider;
+        public IGamesCloudSaveProvider CloudSaveProvider => _cloudSaveProvider;
+        public IGamesStatsProvider StatsProvider => _statsProvider;
+        public IGamesEventsProvider EventsProvider => _eventsProvider;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Initialize()
@@ -80,6 +110,9 @@ namespace BizSim.GPlay.Games
         {
             ResolveConfig();
 
+            if (_config.debugMode)
+                BizSimGamesLogger.ForceDebug = true;
+
             #if UNITY_ANDROID && !UNITY_EDITOR
                 BizSimGamesLogger.Info("Platform: Android (JNI Bridge)");
                 if (_config.enableAuth)
@@ -92,6 +125,8 @@ namespace BizSim.GPlay.Games
                     _cloudSaveProvider = new GamesCloudSaveController();
                 if (_config.enableStats)
                     _statsProvider = new GamesStatsController();
+                if (_config.enableEvents)
+                    _eventsProvider = new GamesEventsController();
             #else
                 BizSimGamesLogger.Info("Platform: Editor (Mock Provider)");
                 var mockData = _config.editorMock;
@@ -105,6 +140,8 @@ namespace BizSim.GPlay.Games
                     _cloudSaveProvider = new MockCloudSaveProvider(mockData);
                 if (_config.enableStats)
                     _statsProvider = new MockStatsProvider(mockData);
+                if (_config.enableEvents)
+                    _eventsProvider = new MockEventsProvider(mockData);
             #endif
         }
 
@@ -112,52 +149,16 @@ namespace BizSim.GPlay.Games
         {
             _config = Resources.Load<GamesServicesConfig>("GamesServicesConfig");
 
-            #pragma warning disable CS0618
             if (_config == null)
             {
-                var legacyMock = Resources.Load<GamesServicesMockConfig>("DefaultGamesConfig");
-                if (legacyMock != null)
-                {
-                    BizSimGamesLogger.Warning("Using legacy DefaultGamesConfig. " +
-                        "Create a GamesServicesConfig asset for full Sidekick support.");
-                    _config = CreateConfigFromLegacy(legacyMock);
-                }
-            }
-            #pragma warning restore CS0618
-
-            if (_config == null)
-            {
+                BizSimGamesLogger.Warning("No GamesServicesConfig found in Resources. " +
+                    "Using default config with all services enabled.");
                 _config = ScriptableObject.CreateInstance<GamesServicesConfig>();
             }
 
             if (_config.hideFlags == HideFlags.None && !IsPersistedAsset(_config))
                 _config.hideFlags = HideFlags.HideAndDontSave;
         }
-
-        #pragma warning disable CS0618
-        private GamesServicesConfig CreateConfigFromLegacy(GamesServicesMockConfig legacyMock)
-        {
-            var config = ScriptableObject.CreateInstance<GamesServicesConfig>();
-            config.hideFlags = HideFlags.HideAndDontSave;
-            config.editorMock.authSucceeds = legacyMock.authSucceeds;
-            config.editorMock.mockPlayerId = legacyMock.mockPlayerId;
-            config.editorMock.mockDisplayName = legacyMock.mockDisplayName;
-            config.editorMock.mockAuthErrorType = legacyMock.mockAuthErrorType;
-            config.editorMock.mockConsentGranted = legacyMock.mockConsentGranted;
-            config.editorMock.mockEmail = legacyMock.mockEmail;
-            config.editorMock.mockEmailVerified = legacyMock.mockEmailVerified;
-            config.editorMock.mockFullName = legacyMock.mockFullName;
-            config.editorMock.mockGivenName = legacyMock.mockGivenName;
-            config.editorMock.mockFamilyName = legacyMock.mockFamilyName;
-            config.editorMock.mockPictureUrl = legacyMock.mockPictureUrl;
-            config.editorMock.mockLocale = legacyMock.mockLocale;
-            config.editorMock.authDelaySeconds = legacyMock.authDelaySeconds;
-            config.editorMock.mockUnlockedCount = legacyMock.mockUnlockedCount;
-            config.editorMock.mockScore = legacyMock.mockScore;
-            config.editorMock.mockChurnProbability = legacyMock.mockChurnProbability;
-            return config;
-        }
-        #pragma warning restore CS0618
 
         private static bool IsPersistedAsset(ScriptableObject obj)
         {
@@ -168,10 +169,29 @@ namespace BizSim.GPlay.Games
             #endif
         }
 
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            if (pauseStatus && _eventsProvider is GamesEventsController eventsController)
+                eventsController.FlushPendingIncrements();
+        }
+
+        private void OnApplicationQuit()
+        {
+            if (_eventsProvider is GamesEventsController eventsController)
+                eventsController.FlushPendingIncrements();
+        }
+
         private void OnDestroy()
         {
             if (_instance == this)
             {
+                (_authProvider as IDisposable)?.Dispose();
+                (_achievementsProvider as IDisposable)?.Dispose();
+                (_leaderboardsProvider as IDisposable)?.Dispose();
+                (_cloudSaveProvider as IDisposable)?.Dispose();
+                (_statsProvider as IDisposable)?.Dispose();
+                (_eventsProvider as IDisposable)?.Dispose();
+
                 _instance = null;
             }
         }

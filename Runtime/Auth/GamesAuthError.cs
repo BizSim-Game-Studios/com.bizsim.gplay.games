@@ -61,12 +61,12 @@ namespace BizSim.GPlay.Games
     /// <summary>
     /// Exception thrown by authentication operations.
     /// </summary>
-    public class GamesAuthException : Exception
+    public class GamesAuthException : GamesException
     {
         public GamesAuthError Error { get; }
 
         public GamesAuthException(GamesAuthError error)
-            : base($"Authentication failed: {error}")
+            : base(error?.errorCode ?? 0, $"Authentication failed: {error}")
         {
             Error = error ?? throw new ArgumentNullException(nameof(error));
         }

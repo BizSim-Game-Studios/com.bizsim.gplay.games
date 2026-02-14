@@ -13,7 +13,7 @@ namespace BizSim.GPlay.Games
         private readonly GamesAchievementController _controller;
 
         public AchievementCallbackProxy(GamesAchievementController controller)
-            : base("com.bizsim.gplay.games.achievements.IAchievementCallback")
+            : base(JniConstants.AchievementCallback)
         {
             _controller = controller;
         }

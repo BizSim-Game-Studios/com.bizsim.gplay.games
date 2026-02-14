@@ -9,6 +9,7 @@ import com.bizsim.gplay.games.callbacks.IAuthCallback;
 import com.google.android.gms.games.AuthenticationResult;
 import com.google.android.gms.games.GamesSignInClient;
 import com.google.android.gms.games.PlayGames;
+import com.google.android.gms.games.PlayGamesSdk;
 import com.google.android.gms.games.Player;
 import com.google.android.gms.games.PlayersClient;
 import com.google.android.gms.games.gamessignin.AuthResponse;
@@ -42,6 +43,7 @@ public class AuthBridge {
 
     private AuthBridge(Activity activity) {
         this.activity = activity;
+        PlayGamesSdk.initialize(activity);
         this.signInClient = PlayGames.getGamesSignInClient(activity);
         Log.d(TAG, "AuthBridge initialized");
     }

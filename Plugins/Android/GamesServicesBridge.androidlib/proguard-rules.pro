@@ -52,6 +52,12 @@
     void onStatsError(int, java.lang.String);
 }
 
+-keepclassmembers interface com.bizsim.gplay.games.events.IEventsCallback {
+    void onEventsLoaded(java.lang.String);
+    void onEventLoaded(java.lang.String);
+    void onEventsError(int, java.lang.String);
+}
+
 # === Google Play Games SDK v2 ===
 -keep class com.google.android.gms.games.** { *; }
 -keep interface com.google.android.gms.games.** { *; }
@@ -73,6 +79,7 @@
 -keep class com.google.android.gms.games.SnapshotsClient$DataOrConflict { *; }
 -keep class com.google.android.gms.games.SnapshotsClient$SnapshotConflict { *; }
 -keep class com.google.android.gms.games.PlayerStatsClient { *; }
+-keep class com.google.android.gms.games.EventsClient { *; }
 
 # Keep common wrapper classes
 -keep class com.google.android.gms.games.AnnotatedData { *; }
@@ -119,10 +126,22 @@
 -keep class com.google.android.gms.games.stats.PlayerStats { *; }
 -keep class com.google.android.gms.games.stats.PlayerStatsBuffer { *; }
 
+# Keep Event classes
+-keep class com.google.android.gms.games.event.Event { *; }
+-keep class com.google.android.gms.games.event.EventBuffer { *; }
+
 # Keep Task classes (async operations)
 -keep class com.google.android.gms.tasks.Task { *; }
 -keep class com.google.android.gms.tasks.OnSuccessListener { *; }
 -keep class com.google.android.gms.tasks.OnFailureListener { *; }
+
+# === Strip Debug Logs in Release Builds ===
+# R8 removes these calls (and their string arguments) when minifyEnabled=true.
+# Only verbose and debug are stripped — info/warn/error preserved for diagnostics.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+}
 
 # === Don't Warn ===
 -dontwarn com.bizsim.gplay.games.**
