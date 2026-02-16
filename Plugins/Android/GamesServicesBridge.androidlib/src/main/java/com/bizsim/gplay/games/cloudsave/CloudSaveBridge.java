@@ -16,6 +16,9 @@ import com.google.android.gms.games.snapshot.SnapshotMetadataChange;
 
 import org.json.JSONObject;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 
 /**
  * JNI bridge for Google Play Games Cloud Save (PGS v2).
@@ -33,6 +36,7 @@ public class CloudSaveBridge {
 
     private final Activity activity;
     private final SnapshotsClient snapshotsClient;
+    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private ICloudSaveCallback callback;
 
     public CloudSaveBridge(Activity activity) {
@@ -87,14 +91,19 @@ public class CloudSaveBridge {
                         handleConflict(dataOrConflict.getConflict());
                     } else {
                         Snapshot snapshot = dataOrConflict.getData();
-                        try {
-                            byte[] data = snapshot.getSnapshotContents().readFully();
-                            if (callback != null) {
-                                callback.onSnapshotRead(filename, data);
+                        ioExecutor.execute(() -> {
+                            try {
+                                byte[] data = snapshot.getSnapshotContents().readFully();
+                                postToMainThread(() -> {
+                                    if (callback != null) {
+                                        callback.onSnapshotRead(filename, data);
+                                    }
+                                });
+                            } catch (Exception e) {
+                                postToMainThread(() ->
+                                    sendError(100, "Read failed: " + e.getMessage(), filename));
                             }
-                        } catch (Exception e) {
-                            sendError(100, "Read failed: " + e.getMessage(), filename);
-                        }
+                        });
                     }
                 })
                 .addOnFailureListener(activity, e -> {
@@ -119,43 +128,49 @@ public class CloudSaveBridge {
                         handleConflict(dataOrConflict.getConflict());
                     } else {
                         Snapshot snapshot = dataOrConflict.getData();
-                        try {
-                            snapshot.getSnapshotContents().writeBytes(data);
+                        ioExecutor.execute(() -> {
+                            try {
+                                snapshot.getSnapshotContents().writeBytes(data);
 
-                            SnapshotMetadataChange.Builder metaBuilder = new SnapshotMetadataChange.Builder()
-                                    .setPlayedTimeMillis(playedTimeMillis);
+                                SnapshotMetadataChange.Builder metaBuilder = new SnapshotMetadataChange.Builder()
+                                        .setPlayedTimeMillis(playedTimeMillis);
 
-                            if (description != null && !description.isEmpty()) {
-                                metaBuilder.setDescription(description);
-                            }
-
-                            if (coverImage != null && coverImage.length > 0) {
-                                try {
-                                    Bitmap bitmap = decodeCoverImageSafe(coverImage);
-                                    if (bitmap != null) {
-                                        metaBuilder.setCoverImage(bitmap);
-                                    }
-                                } catch (OutOfMemoryError e) {
-                                    Log.e(TAG,
-                                        "Cover image decode OOM (" + coverImage.length + " bytes). " +
-                                        "Use max 640x360 resolution. Save continues without cover image.", e);
+                                if (description != null && !description.isEmpty()) {
+                                    metaBuilder.setDescription(description);
                                 }
-                            }
 
-                            snapshotsClient.commitAndClose(snapshot, metaBuilder.build())
-                                    .addOnSuccessListener(activity, metadata -> {
-                                        Log.d(TAG, "Snapshot committed: " + filename);
-                                        if (callback != null) {
-                                            callback.onSnapshotCommitted(filename);
+                                if (coverImage != null && coverImage.length > 0) {
+                                    try {
+                                        Bitmap bitmap = decodeCoverImageSafe(coverImage);
+                                        if (bitmap != null) {
+                                            metaBuilder.setCoverImage(bitmap);
                                         }
-                                    })
-                                    .addOnFailureListener(activity, e -> {
-                                        sendError(100, "Commit failed: " + e.getMessage(), filename);
-                                    });
+                                    } catch (OutOfMemoryError e) {
+                                        Log.e(TAG,
+                                            "Cover image decode OOM (" + coverImage.length + " bytes). " +
+                                            "Use max 640x360 resolution. Save continues without cover image.", e);
+                                    }
+                                }
 
-                        } catch (Exception e) {
-                            sendError(100, "Write failed: " + e.getMessage(), filename);
-                        }
+                                SnapshotMetadataChange metaChange = metaBuilder.build();
+
+                                postToMainThread(() ->
+                                    snapshotsClient.commitAndClose(snapshot, metaChange)
+                                            .addOnSuccessListener(activity, metadata -> {
+                                                Log.d(TAG, "Snapshot committed: " + filename);
+                                                if (callback != null) {
+                                                    callback.onSnapshotCommitted(filename);
+                                                }
+                                            })
+                                            .addOnFailureListener(activity, e -> {
+                                                sendError(100, "Commit failed: " + e.getMessage(), filename);
+                                            }));
+
+                            } catch (Exception e) {
+                                postToMainThread(() ->
+                                    sendError(100, "Write failed: " + e.getMessage(), filename));
+                            }
+                        });
                     }
                 })
                 .addOnFailureListener(activity, e -> {
@@ -237,32 +252,38 @@ public class CloudSaveBridge {
         }
     }
 
-    // Stores last conflict for resolution
-    private SnapshotsClient.SnapshotConflict lastConflict;
+    private volatile SnapshotsClient.SnapshotConflict lastConflict;
 
     /**
      * Handles snapshot conflict using PGS v2 SnapshotsClient.SnapshotConflict.
+     * Heavy I/O (readFully) runs on a background thread to prevent ANR.
+     * JNI callback is posted back to main thread for AndroidJavaProxy safety.
      */
     private void handleConflict(SnapshotsClient.SnapshotConflict conflict) {
-        try {
-            this.lastConflict = conflict;
+        this.lastConflict = conflict;
 
-            Snapshot conflictSnapshot = conflict.getConflictingSnapshot();
-            Snapshot serverSnapshot = conflict.getSnapshot();
+        ioExecutor.execute(() -> {
+            try {
+                Snapshot conflictSnapshot = conflict.getConflictingSnapshot();
+                Snapshot serverSnapshot = conflict.getSnapshot();
 
-            String localJson = serializeSnapshot(conflictSnapshot);
-            String serverJson = serializeSnapshot(serverSnapshot);
+                String localJson = serializeSnapshot(conflictSnapshot);
+                String serverJson = serializeSnapshot(serverSnapshot);
 
-            byte[] localData = conflictSnapshot.getSnapshotContents().readFully();
-            byte[] serverData = serverSnapshot.getSnapshotContents().readFully();
+                byte[] localData = conflictSnapshot.getSnapshotContents().readFully();
+                byte[] serverData = serverSnapshot.getSnapshotContents().readFully();
 
-            if (callback != null) {
-                callback.onConflictDetected(localJson, serverJson, localData, serverData);
+                postToMainThread(() -> {
+                    if (callback != null) {
+                        callback.onConflictDetected(localJson, serverJson, localData, serverData);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to handle conflict", e);
+                postToMainThread(() ->
+                    sendError(100, "Conflict handling failed: " + e.getMessage(), null));
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to handle conflict", e);
-            sendError(100, "Conflict handling failed: " + e.getMessage(), null);
-        }
+        });
     }
 
     /**
@@ -366,9 +387,23 @@ public class CloudSaveBridge {
         return obj.toString();
     }
 
+    private void postToMainThread(Runnable r) {
+        if (activity != null && !activity.isFinishing() && !activity.isDestroyed()) {
+            activity.runOnUiThread(r);
+        } else {
+            Log.w(TAG, "Activity not available, dropping callback");
+        }
+    }
+
     private void sendError(int errorCode, String errorMessage, String filename) {
         if (callback != null) {
             callback.onCloudSaveError(errorCode, errorMessage, filename);
         }
+    }
+
+    public void shutdown() {
+        ioExecutor.shutdownNow();
+        lastConflict = null;
+        callback = null;
     }
 }

@@ -397,6 +397,9 @@ namespace BizSim.GPlay.Games
 
             ReleaseAllCoverImages();
             _callbackProxy = null;
+
+            try { Bridge?.Call("shutdown"); }
+            catch (System.Exception) { }
         }
     }
 }

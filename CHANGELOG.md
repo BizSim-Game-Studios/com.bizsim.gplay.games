@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.14.1] - 2026-02-16
+
+### Fixed
+- **Cloud save ANR on conflict detection** — moved blocking I/O (`readFully`, `writeBytes`, `decodeCoverImageSafe`) from Android main thread to single-threaded `ioExecutor` in `CloudSaveBridge`; JNI callbacks posted back to main thread via `postToMainThread` for AndroidJavaProxy safety
+- **Cloud save ANR on snapshot read** — `readSnapshot()` `readFully` call offloaded to background thread
+- **Cloud save ANR on snapshot commit** — `commitSnapshot()` `writeBytes` and bitmap decode offloaded to background thread
+
+### Added
+- `CloudSaveBridge.shutdown()` method — cleanly terminates the I/O executor thread; called from `GamesCloudSaveController.OnDispose()`
+- `CloudSaveBridge.postToMainThread()` helper — guards `runOnUiThread` against destroyed Activity state (`isFinishing`/`isDestroyed` check)
+- `lastConflict` field made `volatile` for cross-thread visibility safety
+
+---
+
 ## [1.14.0] - 2026-02-14
 
 ### Fixed
