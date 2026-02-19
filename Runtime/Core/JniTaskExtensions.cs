@@ -25,19 +25,26 @@ namespace BizSim.GPlay.Games
             if (timeoutMs <= 0)
                 timeoutMs = ResolveTimeoutMs();
 
+            var startTime = System.Diagnostics.Stopwatch.StartNew();
+            BizSimGamesLogger.Info($"[JniTimeout] Timer started: {timeoutMs}ms, appFocused={UnityEngine.Application.isFocused}");
+
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var timeoutTask = Task.Delay(timeoutMs, timeoutCts.Token);
 
             var completedTask = await Task.WhenAny(task, timeoutTask);
 
+            startTime.Stop();
+
             if (completedTask == timeoutTask)
             {
+                BizSimGamesLogger.Error($"[JniTimeout] TIMED OUT after {startTime.ElapsedMilliseconds}ms (limit={timeoutMs}ms), appFocused={UnityEngine.Application.isFocused}");
                 tcs.TrySetException(new TimeoutException(
-                    $"JNI operation timed out after {timeoutMs}ms"));
+                    $"JNI operation timed out after {timeoutMs}ms (elapsed={startTime.ElapsedMilliseconds}ms, focused={UnityEngine.Application.isFocused})"));
                 throw new TimeoutException($"JNI operation timed out after {timeoutMs}ms");
             }
 
             timeoutCts.Cancel();
+            BizSimGamesLogger.Info($"[JniTimeout] Completed in {startTime.ElapsedMilliseconds}ms");
             return await task;
         }
     }

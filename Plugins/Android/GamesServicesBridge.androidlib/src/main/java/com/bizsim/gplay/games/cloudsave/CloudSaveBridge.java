@@ -6,7 +6,13 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Build;
 import android.util.Log;
+
+import androidx.activity.ComponentActivity;
+import androidx.activity.result.ActivityResult;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 
 import com.google.android.gms.games.PlayGames;
 import com.google.android.gms.games.SnapshotsClient;
@@ -20,29 +26,34 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 
-/**
- * JNI bridge for Google Play Games Cloud Save (PGS v2).
- *
- * PGS v2 notes:
- * - Conflict class is SnapshotsClient.SnapshotConflict (not snapshot.SnapshotConflict)
- * - open() returns Task<DataOrConflict<Snapshot>>
- */
 public class CloudSaveBridge {
     private static final String TAG = "BizSimGames.CloudSave";
     private static final int CONFLICT_RESOLUTION_POLICY_MANUAL = -1;
-    private static final int RC_SAVED_GAMES = 9004;
-
-    private static ICloudSaveCallback pendingUICallback;
 
     private final Activity activity;
     private final SnapshotsClient snapshotsClient;
-    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "BizSimCloudSave-IO");
+        t.setDaemon(true);
+        return t;
+    });
+    private final ActivityResultLauncher<Intent> savedGamesLauncher;
     private ICloudSaveCallback callback;
+    private ICloudSaveCallback savedGamesCallback;
 
     public CloudSaveBridge(Activity activity) {
         this.activity = activity;
         this.snapshotsClient = PlayGames.getSnapshotsClient(activity);
-        Log.d(TAG, "CloudSaveBridge initialized");
+
+        this.savedGamesLauncher = ((ComponentActivity) activity)
+                .getActivityResultRegistry()
+                .register(
+                        "bizsim_saved_games",
+                        new ActivityResultContracts.StartActivityForResult(),
+                        this::handleSavedGamesResult
+                );
+
+        Log.d(TAG, "CloudSaveBridge initialized with ActivityResultLauncher");
     }
 
     public void setCallback(ICloudSaveCallback callback) {
@@ -185,7 +196,6 @@ public class CloudSaveBridge {
         snapshotsClient.open(filename, false, CONFLICT_RESOLUTION_POLICY_MANUAL)
                 .addOnSuccessListener(activity, dataOrConflict -> {
                     if (dataOrConflict.isConflict()) {
-                        // Resolve conflict by picking server version, then retry delete
                         Log.w(TAG, "Conflict on delete open for: " + filename);
                         handleConflict(dataOrConflict.getConflict());
                     } else {
@@ -211,54 +221,69 @@ public class CloudSaveBridge {
     public void showSavedGamesUI(String title, boolean allowAddButton, boolean allowDelete, int maxSnapshots) {
         Log.d(TAG, "Show saved games UI");
 
-        pendingUICallback = callback;
+        savedGamesCallback = callback;
 
         snapshotsClient.getSelectSnapshotIntent(title, allowAddButton, allowDelete, maxSnapshots)
                 .addOnSuccessListener(activity, intent -> {
-                    activity.startActivityForResult(intent, RC_SAVED_GAMES);
+                    if (intent != null) {
+                        savedGamesLauncher.launch(intent);
+                    } else {
+                        Log.w(TAG, "getSelectSnapshotIntent returned null intent — UI not available");
+                        ICloudSaveCallback cb = savedGamesCallback;
+                        savedGamesCallback = null;
+                        if (cb != null) {
+                            cb.onSavedGamesUIResult(null);
+                        }
+                    }
                 })
                 .addOnFailureListener(activity, e -> {
-                    pendingUICallback = null;
+                    savedGamesCallback = null;
                     sendError(100, "UI failed: " + e.getMessage(), null);
                 });
     }
 
-    public static void handleActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode != RC_SAVED_GAMES || pendingUICallback == null) return;
+    private void handleSavedGamesResult(ActivityResult result) {
+        ICloudSaveCallback cb = savedGamesCallback;
+        savedGamesCallback = null;
+
+        if (cb == null) {
+            Log.w(TAG, "Saved games result received but no callback registered");
+            return;
+        }
 
         try {
-            if (resultCode == Activity.RESULT_OK && data != null) {
+            Intent data = result.getData();
+            if (result.getResultCode() == Activity.RESULT_OK && data != null) {
                 if (data.hasExtra(SnapshotsClient.EXTRA_SNAPSHOT_METADATA)) {
-                    SnapshotMetadata metadata = data.getParcelableExtra(
-                        SnapshotsClient.EXTRA_SNAPSHOT_METADATA);
-                    if (metadata != null) {
-                        pendingUICallback.onSavedGamesUIResult(metadata.getUniqueName());
+                    SnapshotMetadata metadata;
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        metadata = data.getParcelableExtra(
+                            SnapshotsClient.EXTRA_SNAPSHOT_METADATA, SnapshotMetadata.class);
                     } else {
-                        pendingUICallback.onSavedGamesUIResult(null);
+                        metadata = data.getParcelableExtra(
+                            SnapshotsClient.EXTRA_SNAPSHOT_METADATA);
+                    }
+                    if (metadata != null) {
+                        cb.onSavedGamesUIResult(metadata.getUniqueName());
+                    } else {
+                        cb.onSavedGamesUIResult(null);
                     }
                 } else if (data.hasExtra(SnapshotsClient.EXTRA_SNAPSHOT_NEW)) {
-                    pendingUICallback.onSavedGamesUIResult("__NEW__");
+                    cb.onSavedGamesUIResult("__NEW__");
                 } else {
-                    pendingUICallback.onSavedGamesUIResult(null);
+                    cb.onSavedGamesUIResult(null);
                 }
             } else {
-                pendingUICallback.onSavedGamesUIResult(null);
+                cb.onSavedGamesUIResult(null);
             }
         } catch (Exception e) {
-            Log.e(TAG, "handleActivityResult error", e);
-            pendingUICallback.onSavedGamesUIResult(null);
-        } finally {
-            pendingUICallback = null;
+            Log.e(TAG, "handleSavedGamesResult error", e);
+            cb.onSavedGamesUIResult(null);
         }
     }
 
     private volatile SnapshotsClient.SnapshotConflict lastConflict;
 
-    /**
-     * Handles snapshot conflict using PGS v2 SnapshotsClient.SnapshotConflict.
-     * Heavy I/O (readFully) runs on a background thread to prevent ANR.
-     * JNI callback is posted back to main thread for AndroidJavaProxy safety.
-     */
     private void handleConflict(SnapshotsClient.SnapshotConflict conflict) {
         this.lastConflict = conflict;
 
@@ -286,12 +311,6 @@ public class CloudSaveBridge {
         });
     }
 
-    /**
-     * Resolves a snapshot conflict.
-     * PGS v2: Uses SnapshotsClient.resolveConflict(conflictId, snapshot).
-     * @param resolution "Local" to keep local, "Server" to keep server version
-     * @param nativeHandle snapshot native handle (unused, kept for C# compatibility)
-     */
     public void resolveConflict(String resolution, String nativeHandle) {
         Log.d(TAG, "Resolve conflict: " + resolution);
 
@@ -402,8 +421,10 @@ public class CloudSaveBridge {
     }
 
     public void shutdown() {
+        savedGamesLauncher.unregister();
         ioExecutor.shutdownNow();
         lastConflict = null;
+        savedGamesCallback = null;
         callback = null;
     }
 }

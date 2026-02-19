@@ -29,9 +29,7 @@ build/
 local.properties
 
 # Development plans (local only)
-**/sidekick-plan/
-*PLAN*.md
-*ROADMAP*.md
+DevelopmentPlans/
 
 # Research cache
 .firecrawl/

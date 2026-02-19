@@ -52,24 +52,32 @@ namespace BizSim.GPlay.Games
         public async Task<SnapshotHandle> OpenSnapshotAsync(string filename, bool createIfNotFound = true, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            BizSimGamesLogger.Info($"[CloudSave] OpenSnapshotAsync START: filename='{filename}', createIfNotFound={createIfNotFound}");
             var tcs = TcsGuard.Replace(ref _openTcs);
 
             using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 CallBridge("openSnapshot", filename, createIfNotFound);
-                return await tcs.Task.WithJniTimeout(tcs, ct: ct);
+                BizSimGamesLogger.Info($"[CloudSave] OpenSnapshotAsync: JNI bridge called, awaiting response...");
+                var result = await tcs.Task.WithJniTimeout(tcs, ct: ct);
+                BizSimGamesLogger.Info($"[CloudSave] OpenSnapshotAsync DONE: filename='{result.filename}', hasConflict={result.hasConflict}, nativeHandle={result.nativeHandle != null}");
+                return result;
             }
         }
 
         public async Task<byte[]> ReadSnapshotAsync(SnapshotHandle handle, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            BizSimGamesLogger.Info($"[CloudSave] ReadSnapshotAsync START: filename='{handle.filename}'");
             var tcs = TcsGuard.Replace(ref _readTcs);
 
             using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 CallBridge("readSnapshot", handle.nativeHandle);
-                return await tcs.Task;
+                BizSimGamesLogger.Info("[CloudSave] ReadSnapshotAsync: JNI bridge called, awaiting data...");
+                var data = await tcs.Task;
+                BizSimGamesLogger.Info($"[CloudSave] ReadSnapshotAsync DONE: {data?.Length ?? 0} bytes");
+                return data;
             }
         }
 
@@ -113,12 +121,16 @@ namespace BizSim.GPlay.Games
             bool allowDelete = true, int maxSnapshots = 5, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            BizSimGamesLogger.Info($"[CloudSave] ShowSavedGamesUIAsync START: title='{title}', allowAdd={allowAddButton}, allowDelete={allowDelete}, maxSnapshots={maxSnapshots}");
             var tcs = TcsGuard.Replace(ref _showUITcs);
 
             using (ct.Register(() => tcs.TrySetCanceled()))
             {
                 CallBridge("showSavedGamesUI", title, allowAddButton, allowDelete, maxSnapshots);
-                return await tcs.Task;
+                BizSimGamesLogger.Info("[CloudSave] ShowSavedGamesUIAsync: JNI bridge called, awaiting UI result...");
+                var result = await tcs.Task;
+                BizSimGamesLogger.Info($"[CloudSave] ShowSavedGamesUIAsync DONE: selectedFilename='{result ?? "(null)"}'");
+                return result;
             }
         }
 
@@ -298,14 +310,18 @@ namespace BizSim.GPlay.Games
 
         public async Task<byte[]> LoadAsync(string filename, CancellationToken ct = default)
         {
+            BizSimGamesLogger.Info($"[CloudSave] LoadAsync START: filename='{filename}'");
             try
             {
                 var handle = await OpenSnapshotAsync(filename, false, ct);
-                return await ReadSnapshotAsync(handle, ct);
+                BizSimGamesLogger.Info($"[CloudSave] LoadAsync: snapshot opened, reading data...");
+                var data = await ReadSnapshotAsync(handle, ct);
+                BizSimGamesLogger.Info($"[CloudSave] LoadAsync DONE: {data?.Length ?? 0} bytes loaded");
+                return data;
             }
             catch (GamesCloudSaveException ex) when (ex.Error.Type == CloudSaveErrorType.SnapshotNotFound)
             {
-                BizSimGamesLogger.Info($"[CloudSave] Snapshot '{filename}' not found, returning null");
+                BizSimGamesLogger.Info($"[CloudSave] LoadAsync: Snapshot '{filename}' not found, returning null");
                 return null;
             }
         }
@@ -314,14 +330,17 @@ namespace BizSim.GPlay.Games
         {
             try
             {
+                BizSimGamesLogger.Info($"[CloudSave] OnSnapshotOpenedFromJava: dispatched to main thread, filename='{filename}', openTcs={(_openTcs != null ? "exists" : "NULL")}");
                 var handle = JsonUtility.FromJson<SnapshotHandle>(snapshotJson);
                 handle.hasConflict = hasConflict;
 
                 OnSnapshotOpened?.Invoke(handle);
-                _openTcs?.TrySetResult(handle);
+                bool wasSet = _openTcs?.TrySetResult(handle) ?? false;
+                BizSimGamesLogger.Info($"[CloudSave] OnSnapshotOpenedFromJava: TrySetResult={wasSet}");
             }
             catch (Exception ex)
             {
+                BizSimGamesLogger.Error($"[CloudSave] OnSnapshotOpenedFromJava ERROR: {ex.Message}");
                 _openTcs?.TrySetException(ex);
             }
         }
@@ -344,7 +363,9 @@ namespace BizSim.GPlay.Games
 
         internal void OnSavedGamesUIResultFromJava(string selectedFilename)
         {
-            _showUITcs?.TrySetResult(selectedFilename);
+            BizSimGamesLogger.Info($"[CloudSave] OnSavedGamesUIResultFromJava: selectedFilename='{selectedFilename ?? "(null)"}', showUITcs={(_showUITcs != null ? "exists" : "NULL")}");
+            bool wasSet = _showUITcs?.TrySetResult(selectedFilename) ?? false;
+            BizSimGamesLogger.Info($"[CloudSave] OnSavedGamesUIResultFromJava: TrySetResult={wasSet}");
         }
 
         internal void OnConflictDetectedFromJava(string localSnapshotJson, string serverSnapshotJson,
@@ -376,6 +397,7 @@ namespace BizSim.GPlay.Games
 
         internal void OnCloudSaveErrorFromJava(int errorCode, string errorMessage, string filename)
         {
+            BizSimGamesLogger.Error($"[CloudSave] OnCloudSaveErrorFromJava: code={errorCode}, msg='{errorMessage}', file='{filename}', pending TCS: open={_openTcs != null}, read={_readTcs != null}, commit={_commitTcs != null}, delete={_deleteTcs != null}, showUI={_showUITcs != null}");
             var error = new GamesCloudSaveError(errorCode, errorMessage, filename);
             OnCloudSaveError?.Invoke(error);
 

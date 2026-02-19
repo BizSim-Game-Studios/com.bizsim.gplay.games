@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.15.1] - 2026-02-19
+
+### Fixed
+- **Fatal crash in CloudSaveBridge.showSavedGamesUI** — `getSelectSnapshotIntent()` can return null Intent on some devices/GMS versions (especially when no snapshots exist); `savedGamesLauncher.launch(null)` triggers NullPointerException in Kotlin-compiled `ActivityResultContracts.StartActivityForResult`. Added null check; returns null result via `onSavedGamesUIResult` (same as user cancellation) instead of crashing.
+
+---
+
+## [1.15.0] - 2026-02-18
+
+### Changed
+- **Gradle modernization** — `compileSdk 36`, `targetSdk 36`, modern DSL (`compileSdkVersion` → `compileSdk`), removed `versionCode`/`versionName` from library module
+- **LeaderboardBridge** — complete rewrite with `ActivityResultLauncher`; `onLeaderboardUIClosed()` now fires when UI actually closes, not when it opens; added `shutdown()` for launcher cleanup
+- **AchievementBridge** — migrated `showAchievementsUI()` from `startActivityForResult` to `ActivityResultLauncher`; fixed `onAchievementsUIClosed()` callback timing; added `addOnFailureListener` to `loadAchievementSteps`; added `shutdown()`
+- **CloudSaveBridge** — `getParcelableExtra` now uses typed API 33+ overload with `Build.VERSION.SDK_INT` check; I/O executor thread now daemon (`setDaemon(true)`) to prevent zombie processes
+- Removed redundant `package` attribute from `AndroidManifest.xml` (AGP 8+ uses `namespace` in build.gradle)
+- Changed `androidx.activity:activity` from `compileOnly 1.8.0` to `implementation 1.12.4` (fixes Gradle consistent resolution conflict with PGS v2 transitive deps)
+- Removed explicit `play-services-tasks` dependency (transitive via PGS v2)
+- Removed all Javadoc comments and inline comments across all bridge classes
+
+---
+
+## [1.14.2] - 2026-02-18
+
+### Fixed
+- **Cloud save UI result never received** — replaced deprecated `startActivityForResult` with `ActivityResultLauncher` in `CloudSaveBridge`; Unity 6 GameActivity does not forward `onActivityResult` to custom Java code, causing `ShowSavedGamesUIAsync` to hang indefinitely
+
+### Changed
+- `CloudSaveBridge` constructor now registers an `ActivityResultLauncher` via `ComponentActivity.getActivityResultRegistry()`
+- `showSavedGamesUI()` uses `savedGamesLauncher.launch(intent)` instead of `activity.startActivityForResult(intent, RC_SAVED_GAMES)`
+- Removed static `pendingUICallback` field and static `handleActivityResult()` method — replaced with instance-bound `handleSavedGamesResult(ActivityResult)` callback
+- `shutdown()` now calls `savedGamesLauncher.unregister()` for cleanup
+- Added `compileOnly 'androidx.activity:activity:1.8.0'` dependency (already in runtime via Unity 6 GameActivity)
+
+---
+
 ## [1.14.1] - 2026-02-16
 
 ### Fixed
