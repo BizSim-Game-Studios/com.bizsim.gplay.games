@@ -33,3 +33,6 @@ DevelopmentPlans/
 
 # Research cache
 .firecrawl/
+
+# MCP server data
+.serena/
