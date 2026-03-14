@@ -7,10 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.15.5] - 2026-03-14
+## [1.15.6] - 2026-03-14
 
 ### Fixed
-- **AGP 8+ namespace error** — setup wizard now generates `AndroidManifest.xml` and `project.properties` in `GooglePlayGamesManifest.androidlib/`. Without these files, AGP 8+ fails with "Namespace not specified" during Gradle build.
+- **AGP 8+ namespace error** — setup wizard now generates `build.gradle` with explicit `namespace` property, `AndroidManifest.xml`, and `project.properties` in `GooglePlayGamesManifest.androidlib/`. Unity's auto-generated build.gradle omits `namespace` when manifest is added after initial cache, causing "Namespace not specified" Gradle failure.
 - **GPGSIds output path** — changed `GPGS_IDS_PATH` from `"Assets/GPGSIds.cs"` to `"Assets/Scripts/Config/GPGSIds.cs"` to match project convention; added `Directory.CreateDirectory()` guard before file write to prevent errors when target folder doesn't exist
 
 ---

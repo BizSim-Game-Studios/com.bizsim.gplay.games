@@ -874,28 +874,45 @@ namespace BizSim.GPlay.Games.Editor
         private void WriteAndroidLibFiles()
         {
             string androidLibDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(RESOURCES_PATH)));
+            const string ns = "com.bizsim.gplay.games.manifest";
 
             string manifestPath = Path.Combine(androidLibDir, "AndroidManifest.xml");
-            if (!File.Exists(manifestPath))
-            {
-                string manifest =
-                    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-                    "<manifest\n" +
-                    "  xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
-                    "  package=\"com.bizsim.gplay.games.manifest\"\n" +
-                    "  android:versionCode=\"1\"\n" +
-                    "  android:versionName=\"1.0\">\n" +
-                    "</manifest>\n";
-                File.WriteAllText(manifestPath, manifest);
-                Debug.Log($"[GamesServices Setup] Created: {manifestPath}");
-            }
+            string manifest =
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                "<manifest\n" +
+                "  xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                $"  package=\"{ns}\"\n" +
+                "  android:versionCode=\"1\"\n" +
+                "  android:versionName=\"1.0\">\n" +
+                "</manifest>\n";
+            File.WriteAllText(manifestPath, manifest);
 
             string propsPath = Path.Combine(androidLibDir, "project.properties");
-            if (!File.Exists(propsPath))
-            {
-                File.WriteAllText(propsPath, "target=android-34\nandroid.library=true\n");
-                Debug.Log($"[GamesServices Setup] Created: {propsPath}");
-            }
+            File.WriteAllText(propsPath, "target=android-34\nandroid.library=true\n");
+
+            string gradlePath = Path.Combine(androidLibDir, "build.gradle");
+            string gradle =
+                "apply plugin: 'com.android.library'\n\n" +
+                "android {\n" +
+                $"    namespace \"{ns}\"\n" +
+                "    compileSdkVersion 36\n\n" +
+                "    defaultConfig {\n" +
+                "        minSdk 28\n" +
+                "        targetSdk 36\n" +
+                "    }\n\n" +
+                "    lint {\n" +
+                "        abortOnError false\n" +
+                "    }\n\n" +
+                "    sourceSets {\n" +
+                "        main {\n" +
+                "            manifest.srcFile 'AndroidManifest.xml'\n" +
+                "            res.srcDirs = ['res']\n" +
+                "        }\n" +
+                "    }\n" +
+                "}\n";
+            File.WriteAllText(gradlePath, gradle);
+
+            Debug.Log($"[GamesServices Setup] Created androidlib files: AndroidManifest.xml, project.properties, build.gradle");
         }
 
         #endregion
