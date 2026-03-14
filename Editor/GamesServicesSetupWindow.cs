@@ -773,6 +773,9 @@ namespace BizSim.GPlay.Games.Editor
                 File.WriteAllText(RESOURCES_PATH, resourcesXml);
                 Debug.Log($"[GamesServices Setup] Created: {RESOURCES_PATH}");
 
+                // Write AndroidManifest.xml and project.properties for AGP 8+ compatibility
+                WriteAndroidLibFiles();
+
                 // Generate GPGSIds.cs constants file
                 GenerateGPGSIds();
 
@@ -865,6 +868,33 @@ namespace BizSim.GPlay.Games.Editor
             catch (System.Exception ex)
             {
                 Debug.LogWarning($"[GamesServices Setup] Could not generate GPGSIds.cs: {ex.Message}");
+            }
+        }
+
+        private void WriteAndroidLibFiles()
+        {
+            string androidLibDir = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(RESOURCES_PATH)));
+
+            string manifestPath = Path.Combine(androidLibDir, "AndroidManifest.xml");
+            if (!File.Exists(manifestPath))
+            {
+                string manifest =
+                    "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                    "<manifest\n" +
+                    "  xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
+                    "  package=\"com.bizsim.gplay.games.manifest\"\n" +
+                    "  android:versionCode=\"1\"\n" +
+                    "  android:versionName=\"1.0\">\n" +
+                    "</manifest>\n";
+                File.WriteAllText(manifestPath, manifest);
+                Debug.Log($"[GamesServices Setup] Created: {manifestPath}");
+            }
+
+            string propsPath = Path.Combine(androidLibDir, "project.properties");
+            if (!File.Exists(propsPath))
+            {
+                File.WriteAllText(propsPath, "target=android-34\nandroid.library=true\n");
+                Debug.Log($"[GamesServices Setup] Created: {propsPath}");
             }
         }
 

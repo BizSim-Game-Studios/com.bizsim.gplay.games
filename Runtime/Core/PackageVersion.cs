@@ -8,7 +8,7 @@ namespace BizSim.GPlay.Games
     /// </summary>
     internal static class PackageVersion
     {
-        public const string Version = "1.15.4";
+        public const string Version = "1.15.5";
         public const string ReleaseDate = "2026-03-14";
         public const string PgsV2SdkVersion = "21.0.0";
     }
