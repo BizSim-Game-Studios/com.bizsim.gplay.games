@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.15.4] - 2026-03-14
+
+### Fixed
+- **GPGSIds output path** — changed `GPGS_IDS_PATH` from `"Assets/GPGSIds.cs"` to `"Assets/Scripts/Config/GPGSIds.cs"` to match project convention; added `Directory.CreateDirectory()` guard before file write to prevent errors when target folder doesn't exist
+
+---
+
 ## [1.15.1] - 2026-02-19
 
 ### Fixed

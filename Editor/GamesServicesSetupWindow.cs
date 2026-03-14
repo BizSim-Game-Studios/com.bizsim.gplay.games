@@ -742,7 +742,7 @@ namespace BizSim.GPlay.Games.Editor
             }
         }
 
-        private const string GPGS_IDS_PATH = "Assets/GPGSIds.cs";
+        private const string GPGS_IDS_PATH = "Assets/Scripts/Config/GPGSIds.cs";
 
         private void PerformSetup()
         {
@@ -856,6 +856,9 @@ namespace BizSim.GPlay.Games.Editor
 
                 sb.AppendLine("}");
 
+                var dir = Path.GetDirectoryName(GPGS_IDS_PATH);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
                 File.WriteAllText(GPGS_IDS_PATH, sb.ToString());
                 Debug.Log($"[GamesServices Setup] Generated: {GPGS_IDS_PATH}");
             }
