@@ -235,6 +235,7 @@ Debug.Log($"High spender probability: {stats.highSpenderProbability}");
 | Issue | Solution |
 |-------|----------|
 | Authentication fails | Check `google-services.json` is in `Assets/Plugins/Android/` |
+| `requestServerSideAccess` fails with status 10 | You are using an **Android** OAuth client ID instead of a **Web application** (Game server) client ID. In Play Console → Play Games Services → Configuration, copy the Client ID from the **Game server** credential, not the Android credential. |
 | Achievements not unlocking | Verify achievement IDs match Google Play Console exactly |
 | Leaderboard not showing | Ensure leaderboard is published in Play Console |
 | Cloud save conflict | Handle `OnConflictDetected` event and call `conflict.ResolveAsync()` |

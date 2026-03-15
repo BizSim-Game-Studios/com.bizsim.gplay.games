@@ -410,11 +410,22 @@ namespace BizSim.GPlay.Games.Editor
                 "The web app client ID is needed to access the user's ID token and call other APIs on behalf of the user.\n\n" +
                 "Required for: ServerSideAccess (backend authentication)\n\n" +
                 "To get this:\n" +
-                "1. Go to Play Console → Configuration → Credentials\n" +
-                "2. Create a new OAuth 2.0 client (Web type)\n" +
-                "3. Copy the Client ID\n\n" +
+                "1. Go to Play Console → Play Games Services → Configuration\n" +
+                "2. Find your \"Game server\" credential (NOT the Android credential)\n" +
+                "3. Copy the OAuth client ID from the Game server entry\n\n" +
                 "Example format: 123456789012-abcdefghijklm.apps.googleusercontent.com",
                 MessageType.None);
+
+            EditorGUILayout.Space(5);
+
+            EditorGUILayout.HelpBox(
+                "⚠️ IMPORTANT: You must use the \"Web application\" (Game server) OAuth client ID here.\n" +
+                "Do NOT use the Android OAuth client ID — it will cause status code 10 (DEVELOPER_ERROR) " +
+                "when calling requestServerSideAccess at runtime.\n\n" +
+                "How to tell them apart in Play Console → Play Games Services → Configuration:\n" +
+                "• Android credential: shows Fingerprint + Package name\n" +
+                "• Game server credential: shows OAuth client ID + OAuth client secret",
+                MessageType.Warning);
 
             EditorGUILayout.Space(5);
             webClientId = EditorGUILayout.TextField("Client ID (Optional)", webClientId);

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.15.7] - 2026-03-15
+
+### Fixed
+- **Setup Wizard: Web Client ID warning** — added prominent warning in Step 5 (Optional Settings) explaining that the "Web application" (Game server) OAuth client ID must be used, not the Android OAuth client ID. Using the wrong type causes `DEVELOPER_ERROR` (status code 10) at runtime when calling `requestServerSideAccess`. Includes visual guide on distinguishing Android vs Game server credentials in Play Console.
+
+---
+
 ## [1.15.6] - 2026-03-14
 
 ### Fixed
