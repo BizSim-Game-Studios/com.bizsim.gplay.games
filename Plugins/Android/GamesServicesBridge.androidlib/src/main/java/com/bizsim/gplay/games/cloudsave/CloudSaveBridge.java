@@ -105,14 +105,11 @@ public class CloudSaveBridge {
                         ioExecutor.execute(() -> {
                             try {
                                 byte[] data = snapshot.getSnapshotContents().readFully();
-                                postToMainThread(() -> {
-                                    if (callback != null) {
-                                        callback.onSnapshotRead(filename, data);
-                                    }
-                                });
+                                if (callback != null) {
+                                    callback.onSnapshotRead(filename, data);
+                                }
                             } catch (Exception e) {
-                                postToMainThread(() ->
-                                    sendError(100, "Read failed: " + e.getMessage(), filename));
+                                sendError(100, "Read failed: " + e.getMessage(), filename);
                             }
                         });
                     }
@@ -165,21 +162,19 @@ public class CloudSaveBridge {
 
                                 SnapshotMetadataChange metaChange = metaBuilder.build();
 
-                                postToMainThread(() ->
-                                    snapshotsClient.commitAndClose(snapshot, metaChange)
-                                            .addOnSuccessListener(activity, metadata -> {
-                                                Log.d(TAG, "Snapshot committed: " + filename);
-                                                if (callback != null) {
-                                                    callback.onSnapshotCommitted(filename);
-                                                }
-                                            })
-                                            .addOnFailureListener(activity, e -> {
-                                                sendError(100, "Commit failed: " + e.getMessage(), filename);
-                                            }));
+                                snapshotsClient.commitAndClose(snapshot, metaChange)
+                                        .addOnSuccessListener(activity, metadata -> {
+                                            Log.d(TAG, "Snapshot committed: " + filename);
+                                            if (callback != null) {
+                                                callback.onSnapshotCommitted(filename);
+                                            }
+                                        })
+                                        .addOnFailureListener(activity, e -> {
+                                            sendError(100, "Commit failed: " + e.getMessage(), filename);
+                                        });
 
                             } catch (Exception e) {
-                                postToMainThread(() ->
-                                    sendError(100, "Write failed: " + e.getMessage(), filename));
+                                sendError(100, "Write failed: " + e.getMessage(), filename);
                             }
                         });
                     }
@@ -298,15 +293,12 @@ public class CloudSaveBridge {
                 byte[] localData = conflictSnapshot.getSnapshotContents().readFully();
                 byte[] serverData = serverSnapshot.getSnapshotContents().readFully();
 
-                postToMainThread(() -> {
-                    if (callback != null) {
-                        callback.onConflictDetected(localJson, serverJson, localData, serverData);
-                    }
-                });
+                if (callback != null) {
+                    callback.onConflictDetected(localJson, serverJson, localData, serverData);
+                }
             } catch (Exception e) {
                 Log.e(TAG, "Failed to handle conflict", e);
-                postToMainThread(() ->
-                    sendError(100, "Conflict handling failed: " + e.getMessage(), null));
+                sendError(100, "Conflict handling failed: " + e.getMessage(), null);
             }
         });
     }
@@ -404,14 +396,6 @@ public class CloudSaveBridge {
         }
 
         return obj.toString();
-    }
-
-    private void postToMainThread(Runnable r) {
-        if (activity != null && !activity.isFinishing() && !activity.isDestroyed()) {
-            activity.runOnUiThread(r);
-        } else {
-            Log.w(TAG, "Activity not available, dropping callback");
-        }
     }
 
     private void sendError(int errorCode, String errorMessage, String filename) {
