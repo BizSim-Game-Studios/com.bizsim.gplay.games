@@ -4,8 +4,10 @@
 # BizSim Google Play Games Bridge - ProGuard/R8 Keep Rules
 # ============================================================
 
-# === Bridge Classes ===
+# === Bridge Classes (includes inner classes, lambdas, and all members) ===
 -keep class com.bizsim.gplay.games.** { *; }
+-keepclassmembers class com.bizsim.gplay.games.** { *; }
+-keep class com.bizsim.gplay.games.**$* { *; }
 
 # === Callback Interfaces (CRITICAL for AndroidJavaProxy) ===
 # AndroidJavaProxy matches methods by NAME - obfuscation breaks this

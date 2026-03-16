@@ -3,6 +3,8 @@
 
 # BizSim Bridge Classes (JNI bridge invoked via AndroidJavaClass from Unity C#)
 -keep class com.bizsim.gplay.games.** { *; }
+-keepclassmembers class com.bizsim.gplay.games.** { *; }
+-keep class com.bizsim.gplay.games.**$* { *; }
 
 # Callback Interfaces (CRITICAL for AndroidJavaProxy — method name matching)
 -keep interface com.bizsim.gplay.games.callbacks.** { *; }
